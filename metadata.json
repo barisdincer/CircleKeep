@@ -1,6 +1,6 @@
 {
   "name": "Network Manager",
-  "description": "Personal relationship network management app",
+  "description": "Personal relationship network management application",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
