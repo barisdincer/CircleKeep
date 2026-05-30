@@ -1,5 +1,7 @@
 package com.example.ui.reports
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +26,34 @@ import java.util.*
 fun ReportsScreen(viewModel: NetworkViewModel) {
     val interactions by viewModel.interactions.collectAsState()
     val people by viewModel.people.collectAsState()
+    val backupState by viewModel.backupState.collectAsState()
+    val context = LocalContext.current
+    var pendingBackupJson by remember { mutableStateOf<String?>(null) }
+
+    val createBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val json = pendingBackupJson ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                outputStream.write(json.toByteArray())
+            }
+        }
+        pendingBackupJson = null
+    }
+
+    val restoreBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val json = context.contentResolver.openInputStream(uri)
+                ?.bufferedReader()
+                ?.use { it.readText() }
+            if (json != null) {
+                viewModel.restoreBackupJson(json)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -120,6 +151,45 @@ fun ReportsScreen(viewModel: NetworkViewModel) {
                         val active = people.count { it.waveId != null }
                         Text("Active Tracking", style = MaterialTheme.typography.bodySmall)
                         Text("$active", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Text("BACKUP", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Local JSON backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        backupState.message ?: "Export before changing devices or reinstalling the app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = {
+                                viewModel.createBackupJson { json ->
+                                    pendingBackupJson = json
+                                    createBackupLauncher.launch("network-manager-backup.json")
+                                }
+                            }
+                        ) {
+                            Text("Export")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                restoreBackupLauncher.launch(arrayOf("application/json", "text/*"))
+                            }
+                        ) {
+                            Text("Import")
+                        }
                     }
                 }
             }

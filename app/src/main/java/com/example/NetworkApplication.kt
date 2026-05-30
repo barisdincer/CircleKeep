@@ -3,11 +3,17 @@ package com.example
 import android.app.Application
 import androidx.room.Room
 import com.example.data.AppDatabase
+import com.example.data.DatabaseMigrations
 import com.example.data.NetworkRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class NetworkApplication : Application() {
     lateinit var database: AppDatabase
     lateinit var repository: NetworkRepository
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
@@ -16,8 +22,11 @@ class NetworkApplication : Application() {
             AppDatabase::class.java,
             "network_database"
         )
-        .fallbackToDestructiveMigration()
+        .addMigrations(*DatabaseMigrations.ALL)
         .build()
         repository = NetworkRepository(database.networkDao())
+        applicationScope.launch {
+            repository.ensureDefaultWaves()
+        }
     }
 }

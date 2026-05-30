@@ -42,8 +42,8 @@ fun AppNavigation() {
                 
                 NavigationBarItem(
                     selected = currentDestination == "dashboard",
-                    label = { Text("Dashboard") },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                    label = { Text("Bugün") },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Bugün") },
                     onClick = { 
                         navController.navigate("dashboard") { 
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -55,8 +55,8 @@ fun AppNavigation() {
                 
                 NavigationBarItem(
                     selected = currentDestination == "people",
-                    label = { Text("Network") },
-                    icon = { Icon(Icons.Default.Group, contentDescription = "Network") },
+                    label = { Text("Kişiler") },
+                    icon = { Icon(Icons.Default.Group, contentDescription = "Kişiler") },
                     onClick = { 
                         navController.navigate("people") {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -68,8 +68,8 @@ fun AppNavigation() {
                 
                 NavigationBarItem(
                     selected = currentDestination == "waves",
-                    label = { Text("Waves") },
-                    icon = { Icon(Icons.Default.Waves, contentDescription = "Waves") },
+                    label = { Text("Döngüler") },
+                    icon = { Icon(Icons.Default.Waves, contentDescription = "Döngüler") },
                     onClick = { 
                         navController.navigate("waves") {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -81,8 +81,8 @@ fun AppNavigation() {
 
                 NavigationBarItem(
                     selected = currentDestination == "reports",
-                    label = { Text("Reports") },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Reports") },
+                    label = { Text("Özet") },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Özet") },
                     onClick = { 
                         navController.navigate("reports") {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
