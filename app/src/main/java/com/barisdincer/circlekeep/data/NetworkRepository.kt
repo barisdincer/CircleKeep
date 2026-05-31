@@ -8,6 +8,7 @@ class NetworkRepository(private val networkDao: NetworkDao) {
     val activeContactTypes: Flow<List<ContactType>> = networkDao.getActiveContactTypes()
     val allWaves: Flow<List<Wave>> = networkDao.getAllWaves()
     val allPeople: Flow<List<Person>> = networkDao.getAllPeople()
+    val allInteractions: Flow<List<InteractionLog>> = networkDao.getAllInteractionLogs()
     val recentInteractions: Flow<List<InteractionLog>> = networkDao.getRecentInteractions()
 
     suspend fun ensureDefaultContactTypes() {
@@ -165,6 +166,26 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         networkDao.logInteractionsAndUpdatePeople(logs)
     }
 
+    suspend fun updateInteractionLog(log: InteractionLog): RepositoryActionResult {
+        val existing = networkDao.getInteractionLogById(log.id)
+            ?: return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
+        val updated = log.copy(note = log.note.trim())
+        networkDao.updateInteractionLog(updated)
+        refreshLastInteraction(existing.personId)
+        if (existing.personId != updated.personId) {
+            refreshLastInteraction(updated.personId)
+        }
+        return RepositoryActionResult(true, "Temas kaydı güncellendi.")
+    }
+
+    suspend fun deleteInteractionLog(id: Int): RepositoryActionResult {
+        val existing = networkDao.getInteractionLogById(id)
+            ?: return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
+        networkDao.deleteInteractionLogById(id)
+        refreshLastInteraction(existing.personId)
+        return RepositoryActionResult(true, "Temas kaydı silindi.")
+    }
+
     suspend fun logPreferredInteraction(personId: Int, note: String = "") {
         val person = networkDao.getPersonById(personId) ?: return
         logInteraction(personId, person.preferredContactTypeKey, note)
@@ -214,6 +235,12 @@ class NetworkRepository(private val networkDao: NetworkDao) {
 
     fun getLogsForPerson(personId: Int): Flow<List<InteractionLog>> {
         return networkDao.getInteractionLogsForPerson(personId)
+    }
+
+    private suspend fun refreshLastInteraction(personId: Int) {
+        val fallback = networkDao.getPersonById(personId)?.addedDate ?: return
+        val latest = networkDao.getLatestInteractionTimestampForPerson(personId) ?: fallback
+        networkDao.updateLastInteraction(personId, latest)
     }
 
     private fun Person.withNormalizedPhone(): Person {

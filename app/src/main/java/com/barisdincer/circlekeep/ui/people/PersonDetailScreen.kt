@@ -30,7 +30,7 @@ import java.util.Locale
 fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () -> Unit) {
     val people by viewModel.people.collectAsState()
     val person = people.find { it.id == personId }
-    val interactions by viewModel.interactions.collectAsState()
+    val interactions by viewModel.allInteractions.collectAsState()
     val contactTypes by viewModel.contactTypes.collectAsState()
     val activeContactTypes by viewModel.activeContactTypes.collectAsState()
     val uiMessage by viewModel.uiMessage.collectAsState()

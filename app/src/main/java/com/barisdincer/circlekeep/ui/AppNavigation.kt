@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -42,10 +44,12 @@ import com.barisdincer.circlekeep.NetworkApplication
 import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.preferences.UserPreferencesStore
 import com.barisdincer.circlekeep.ui.dashboard.DashboardScreen
+import com.barisdincer.circlekeep.ui.logs.LogsScreen
 import com.barisdincer.circlekeep.ui.people.PeopleScreen
 import com.barisdincer.circlekeep.ui.people.PersonDetailScreen
 import com.barisdincer.circlekeep.ui.profile.ProfileScreen
 import com.barisdincer.circlekeep.ui.reports.ReportsScreen
+import com.barisdincer.circlekeep.ui.waves.GroupDetailScreen
 import com.barisdincer.circlekeep.ui.waves.WavesScreen
 
 @Composable
@@ -94,7 +98,15 @@ fun AppNavigation(
                 )
             }
             composable("waves") {
-                WavesScreen(viewModel)
+                WavesScreen(
+                    viewModel = viewModel,
+                    onGroupClick = { waveId ->
+                        navController.navigate("group_detail/$waveId")
+                    }
+                )
+            }
+            composable("logs") {
+                LogsScreen(viewModel)
             }
             composable("reports") {
                 ReportsScreen(viewModel)
@@ -118,13 +130,27 @@ fun AppNavigation(
                     onBack = { navController.popBackStack() }
                 )
             }
+            composable(
+                route = "group_detail/{waveId}",
+                arguments = listOf(navArgument("waveId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val waveId = backStackEntry.arguments?.getInt("waveId") ?: return@composable
+                GroupDetailScreen(
+                    waveId = waveId,
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onPersonClick = { personId ->
+                        navController.navigate("person_detail/$personId")
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun BottomNavigationBar(navController: NavHostController) {
-    val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route
+    val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route.orEmpty()
 
     Surface(
         modifier = Modifier
@@ -148,18 +174,25 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 onClick = { navController.navigateTopLevel("dashboard") }
             )
             CompactNavItem(
-                selected = currentDestination == "people",
+                selected = currentDestination == "people" || currentDestination.startsWith("person_detail"),
                 label = "Kişiler",
                 icon = Icons.Default.Group,
                 modifier = Modifier.weight(1f),
                 onClick = { navController.navigateTopLevel("people") }
             )
             CompactNavItem(
-                selected = currentDestination == "waves",
+                selected = currentDestination == "waves" || currentDestination.startsWith("group_detail"),
                 label = "Gruplar",
                 icon = Icons.Default.Group,
                 modifier = Modifier.weight(1f),
                 onClick = { navController.navigateTopLevel("waves") }
+            )
+            CompactNavItem(
+                selected = currentDestination == "logs",
+                label = "Log",
+                icon = Icons.Default.History,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigateTopLevel("logs") }
             )
             CompactNavItem(
                 selected = currentDestination == "reports",
@@ -167,6 +200,13 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 icon = Icons.Default.DateRange,
                 modifier = Modifier.weight(1f),
                 onClick = { navController.navigateTopLevel("reports") }
+            )
+            CompactNavItem(
+                selected = currentDestination == "profile",
+                label = "Profil",
+                icon = Icons.Default.Person,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigateTopLevel("profile") }
             )
         }
     }

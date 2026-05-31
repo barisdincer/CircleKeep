@@ -160,4 +160,39 @@ class NetworkRepositoryTest {
         assertEquals(listOf(DefaultContactTypes.MEETING, DefaultContactTypes.MEETING), logs.map { it.type })
         assertEquals(listOf("Kahvede buluştuk", "Kahvede buluştuk"), logs.map { it.note })
     }
+
+    @Test
+    fun `updating latest log refreshes person last interaction`() = runBlocking {
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 100L)
+        val log = repository.getInteractionSnapshot().single()
+
+        val result = repository.updateInteractionLog(log.copy(timestamp = 250L, type = DefaultContactTypes.MESSAGE, note = "Güncellendi"))
+
+        val person = repository.getPeopleSnapshot().single()
+        val updatedLog = repository.getInteractionSnapshot().single()
+        assertTrue(result.success)
+        assertEquals(250L, person.lastInteractionDate)
+        assertEquals(DefaultContactTypes.MESSAGE, updatedLog.type)
+        assertEquals("Güncellendi", updatedLog.note)
+    }
+
+    @Test
+    fun `deleting latest log falls back to previous log or added date`() = runBlocking {
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 100L)
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.MESSAGE, timestamp = 200L)
+        val latestLog = repository.getInteractionSnapshot().first { it.timestamp == 200L }
+
+        val result = repository.deleteInteractionLog(latestLog.id)
+
+        assertTrue(result.success)
+        assertEquals(100L, repository.getPeopleSnapshot().single().lastInteractionDate)
+
+        val remainingLog = repository.getInteractionSnapshot().single()
+        repository.deleteInteractionLog(remainingLog.id)
+
+        assertEquals(10L, repository.getPeopleSnapshot().single().lastInteractionDate)
+        assertTrue(repository.getInteractionSnapshot().isEmpty())
+    }
 }

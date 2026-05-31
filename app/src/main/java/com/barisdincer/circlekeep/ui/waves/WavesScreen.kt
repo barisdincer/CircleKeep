@@ -1,6 +1,7 @@
 package com.barisdincer.circlekeep.ui.waves
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -65,7 +66,7 @@ import com.barisdincer.circlekeep.ui.NetworkViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WavesScreen(viewModel: NetworkViewModel) {
+fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
     val waves by viewModel.waves.collectAsState()
     val people by viewModel.people.collectAsState()
     val interactions by viewModel.interactions.collectAsState()
@@ -154,6 +155,7 @@ fun WavesScreen(viewModel: NetworkViewModel) {
                     GroupCard(
                         wave = wave,
                         personCount = people.count { it.waveId == wave.id },
+                        onClick = { onGroupClick(wave.id) },
                         onEdit = { sheetState = ManagementSheet.EditGroup(wave) },
                         onDelete = { sheetState = ManagementSheet.DeleteGroup(wave) }
                     )
@@ -238,11 +240,12 @@ fun WavesScreen(viewModel: NetworkViewModel) {
 private fun GroupCard(
     wave: Wave,
     personCount: Int,
+    onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)

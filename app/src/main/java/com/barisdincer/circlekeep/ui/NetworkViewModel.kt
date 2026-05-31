@@ -52,6 +52,9 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
     val interactions: StateFlow<List<InteractionLog>> = repository.recentInteractions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allInteractions: StateFlow<List<InteractionLog>> = repository.allInteractions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val uniqueTags: StateFlow<List<String>> = repository.allPeople.map { people ->
         people.flatMap { it.tags.split(",") }
             .map { it.trim() }
@@ -231,6 +234,13 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
+    fun movePersonToWave(personId: Int, waveId: Int?) {
+        viewModelScope.launch {
+            repository.updatePersonWave(personId, waveId)
+            _uiMessage.value = "Kişi gruba eklendi."
+        }
+    }
+
     fun logInteraction(
         personId: Int,
         type: String,
@@ -252,6 +262,18 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         viewModelScope.launch {
             repository.logInteractions(personIds, type, note, timestamp)
             _uiMessage.value = "${personIds.distinct().size} kişi için temas kaydedildi."
+        }
+    }
+
+    fun updateInteractionLog(log: InteractionLog) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.updateInteractionLog(log).message
+        }
+    }
+
+    fun deleteInteractionLog(id: Int) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.deleteInteractionLog(id).message
         }
     }
 

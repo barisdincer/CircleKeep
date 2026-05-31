@@ -129,14 +129,29 @@ interface NetworkDao {
     @Query("SELECT * FROM interaction_logs WHERE personId = :personId ORDER BY timestamp DESC")
     fun getInteractionLogsForPerson(personId: Int): Flow<List<InteractionLog>>
 
+    @Query("SELECT * FROM interaction_logs ORDER BY timestamp DESC")
+    fun getAllInteractionLogs(): Flow<List<InteractionLog>>
+
     @Query("SELECT * FROM interaction_logs ORDER BY timestamp DESC LIMIT 100")
     fun getRecentInteractions(): Flow<List<InteractionLog>>
+
+    @Query("SELECT * FROM interaction_logs WHERE id = :id LIMIT 1")
+    suspend fun getInteractionLogById(id: Int): InteractionLog?
 
     @Query("SELECT * FROM interaction_logs ORDER BY timestamp DESC")
     suspend fun getInteractionSnapshot(): List<InteractionLog>
 
+    @Query("SELECT MAX(timestamp) FROM interaction_logs WHERE personId = :personId")
+    suspend fun getLatestInteractionTimestampForPerson(personId: Int): Long?
+
     @Query("SELECT COUNT(*) FROM interaction_logs WHERE type = :type")
     suspend fun countInteractionLogsByType(type: String): Int
+
+    @Update
+    suspend fun updateInteractionLog(log: InteractionLog)
+
+    @Query("DELETE FROM interaction_logs WHERE id = :id")
+    suspend fun deleteInteractionLogById(id: Int)
 
     @Query("DELETE FROM interaction_logs")
     suspend fun clearInteractionLogs()

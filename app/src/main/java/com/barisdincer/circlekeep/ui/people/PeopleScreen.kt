@@ -32,6 +32,7 @@ import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.resolveTimestamp
+import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.device.PhonebookContact
 import com.barisdincer.circlekeep.device.PhonebookReader
 import com.barisdincer.circlekeep.ui.NetworkViewModel
@@ -57,7 +58,7 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
         people.filter { it.tags.contains(selectedTag!!, ignoreCase = true) }
     } else {
         people
-    }
+    }.sortedByTurkish { it.name }
 
     val bulkImportPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -211,6 +212,7 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
             AddPersonDialog(
                 waves = waves,
                 contactTypes = activeContactTypes,
+                initialWaveId = null,
                 onDismiss = { showAddDialog = false },
                 onAdd = { name, phone, waveId, contactLookupKey, initialType, initialTimestamp, initialNote ->
                     viewModel.addPerson(
@@ -229,7 +231,7 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
 
         if (showBulkImportDialog) {
             val contacts = remember(people) {
-                PhonebookReader.readContacts(context, people)
+                PhonebookReader.readContacts(context, people).sortedByTurkish { it.name }
             }
             BulkImportContactsDialog(
                 contacts = contacts,
@@ -402,13 +404,14 @@ fun BulkImportContactsDialog(
 fun AddPersonDialog(
     waves: List<Wave>,
     contactTypes: List<ContactType>,
+    initialWaveId: Int? = null,
     onDismiss: () -> Unit,
     onAdd: (String, String, Int?, String?, String?, Long?, String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var contactLookupKey by remember { mutableStateOf<String?>(null) }
-    var selectedWaveId by remember { mutableStateOf<Int?>(null) }
+    var selectedWaveId by remember(initialWaveId) { mutableStateOf(initialWaveId) }
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
     var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
     var initialDatePreset by remember { mutableStateOf(ContactDatePreset.TODAY) }

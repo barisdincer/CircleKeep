@@ -1,0 +1,528 @@
+package com.barisdincer.circlekeep.ui.waves
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.barisdincer.circlekeep.data.ContactDatePreset
+import com.barisdincer.circlekeep.data.ContactType
+import com.barisdincer.circlekeep.data.DefaultContactTypes
+import com.barisdincer.circlekeep.data.InteractionLog
+import com.barisdincer.circlekeep.data.Person
+import com.barisdincer.circlekeep.data.Wave
+import com.barisdincer.circlekeep.data.groupMemberRhythm
+import com.barisdincer.circlekeep.data.resolveTimestamp
+import com.barisdincer.circlekeep.data.sortedByTurkish
+import com.barisdincer.circlekeep.data.statusLabel
+import com.barisdincer.circlekeep.ui.NetworkViewModel
+import com.barisdincer.circlekeep.ui.people.AddPersonDialog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun GroupDetailScreen(
+    waveId: Int,
+    viewModel: NetworkViewModel,
+    onBack: () -> Unit,
+    onPersonClick: (Int) -> Unit
+) {
+    val waves by viewModel.waves.collectAsState()
+    val people by viewModel.people.collectAsState()
+    val interactions by viewModel.allInteractions.collectAsState()
+    val contactTypes by viewModel.contactTypes.collectAsState()
+    val activeContactTypes by viewModel.activeContactTypes.collectAsState()
+    val uiMessage by viewModel.uiMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val wave = waves.find { it.id == waveId }
+    val groupPeople = people.filter { it.waveId == waveId }.sortedByTurkish { it.name }
+    val groupPersonIds = groupPeople.map { it.id }.toSet()
+    val groupLogs = interactions.filter { it.personId in groupPersonIds }
+    val noteLogs = groupLogs.filter { it.note.isNotBlank() }
+
+    var showNewPersonSheet by remember { mutableStateOf(false) }
+    var showExistingPersonSheet by remember { mutableStateOf(false) }
+    var showGroupLogSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiMessage) {
+        val message = uiMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearUiMessage()
+    }
+
+    if (wave == null) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+            topBar = {
+                TopAppBar(
+                    title = { Text("Grup bulunamadı") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            Text(
+                "Bu grup artık mevcut değil.",
+                modifier = Modifier.padding(padding).padding(16.dp)
+            )
+        }
+        return
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text(wave.name, fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            }
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 12.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                GroupActionsCard(
+                    memberCount = groupPeople.size,
+                    frequencyDays = wave.frequencyDays,
+                    onNewPerson = { showNewPersonSheet = true },
+                    onExistingPerson = { showExistingPersonSheet = true },
+                    onLogGroup = { showGroupLogSheet = true }
+                )
+            }
+
+            item {
+                Text("Üyeler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            if (groupPeople.isEmpty()) {
+                item {
+                    EmptyGroupCard()
+                }
+            }
+
+            items(groupPeople, key = { it.id }) { person ->
+                val rhythm = groupMemberRhythm(person, wave)
+                val lastLog = groupLogs.firstOrNull { it.personId == person.id }
+                GroupMemberCard(
+                    person = person,
+                    rhythmLabel = rhythm.statusLabel(),
+                    daysSince = rhythm.daysSinceLastInteraction,
+                    effectiveFrequencyDays = rhythm.effectiveFrequencyDays,
+                    lastLog = lastLog,
+                    contactTypes = contactTypes,
+                    onClick = { onPersonClick(person.id) }
+                )
+            }
+
+            item {
+                Text("Not geçmişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            if (noteLogs.isEmpty()) {
+                item {
+                    Text(
+                        "Bu grup için notlu temas kaydı yok.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            items(noteLogs, key = { it.id }) { log ->
+                val person = people.find { it.id == log.personId }
+                GroupNoteCard(log = log, personName = person?.name ?: "Kişi", contactTypes = contactTypes)
+            }
+        }
+
+        if (showNewPersonSheet) {
+            AddPersonDialog(
+                waves = waves,
+                contactTypes = activeContactTypes,
+                initialWaveId = wave.id,
+                onDismiss = { showNewPersonSheet = false },
+                onAdd = { name, phone, selectedWaveId, contactLookupKey, initialType, initialTimestamp, initialNote ->
+                    viewModel.addPerson(
+                        name = name,
+                        phoneNumber = phone,
+                        waveId = selectedWaveId ?: wave.id,
+                        contactLookupKey = contactLookupKey,
+                        initialInteractionType = initialType,
+                        initialInteractionTimestamp = initialTimestamp,
+                        initialInteractionNote = initialNote
+                    )
+                    showNewPersonSheet = false
+                }
+            )
+        }
+
+        if (showExistingPersonSheet) {
+            ExistingPersonSheet(
+                people = people.filter { it.waveId != wave.id },
+                onDismiss = { showExistingPersonSheet = false },
+                onSelect = { personId ->
+                    viewModel.movePersonToWave(personId, wave.id)
+                    showExistingPersonSheet = false
+                }
+            )
+        }
+
+        if (showGroupLogSheet) {
+            GroupContactLogSheet(
+                contactTypes = activeContactTypes,
+                enabled = groupPeople.isNotEmpty(),
+                onDismiss = { showGroupLogSheet = false },
+                onSave = { type, note, timestamp ->
+                    viewModel.logInteractions(groupPeople.map { it.id }, type, note, timestamp)
+                    showGroupLogSheet = false
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GroupActionsCard(
+    memberCount: Int,
+    frequencyDays: Int,
+    onNewPerson: () -> Unit,
+    onExistingPerson: () -> Unit,
+    onLogGroup: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "$memberCount kişi · $frequencyDays günde bir",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onLogGroup, shape = RoundedCornerShape(8.dp)) {
+                    Icon(Icons.Default.EditNote, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Grup teması")
+                }
+                OutlinedButton(onClick = onNewPerson, shape = RoundedCornerShape(8.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Yeni kişi")
+                }
+                OutlinedButton(onClick = onExistingPerson, shape = RoundedCornerShape(8.dp)) {
+                    Icon(Icons.Default.Group, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Mevcut kişi")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupMemberCard(
+    person: Person,
+    rhythmLabel: String,
+    daysSince: Long,
+    effectiveFrequencyDays: Int,
+    lastLog: InteractionLog?,
+    contactTypes: List<ContactType>,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        rhythmLabel,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Text(
+                "$daysSince gün önce temas · ritim $effectiveFrequencyDays gün",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            lastLog?.let {
+                Text(
+                    "Son kayıt: ${interactionTypeLabel(it.type, contactTypes)} · ${formatShortDate(it.timestamp)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupNoteCard(log: InteractionLog, personName: String, contactTypes: List<ContactType>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "$personName · ${interactionTypeLabel(log.type, contactTypes)} · ${formatShortDate(log.timestamp)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(log.note, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun EmptyGroupCard() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Text(
+            "Bu grupta henüz kişi yok.",
+            modifier = Modifier.padding(14.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExistingPersonSheet(
+    people: List<Person>,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("Mevcut kişiyi ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            if (people.isEmpty()) {
+                Text("Gruba eklenebilecek başka kişi yok.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            people.sortedByTurkish { it.name }.forEach { person ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    onClick = { onSelect(person.id) }
+                ) {
+                    Text(person.name, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Medium)
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun GroupContactLogSheet(
+    contactTypes: List<ContactType>,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, String, Long) -> Unit
+) {
+    val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
+    var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
+    var selectedDatePreset by remember { mutableStateOf(ContactDatePreset.TODAY) }
+    var note by remember { mutableStateOf("") }
+    var typeExpanded by remember { mutableStateOf(false) }
+    val selectedType = typeOptions.find { it.key == selectedTypeKey } ?: typeOptions.first()
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        Column(
+            modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Grup teması kaydet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Seçilen tür tüm grup üyeleri için aynı zaman ve notla kaydedilir.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = !typeExpanded }) {
+                OutlinedTextField(
+                    value = selectedType.label,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("İletişim türü") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
+                    typeOptions.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.label) },
+                            onClick = {
+                                selectedTypeKey = type.key
+                                typeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(
+                    ContactDatePreset.TODAY,
+                    ContactDatePreset.YESTERDAY,
+                    ContactDatePreset.THREE_DAYS_AGO,
+                    ContactDatePreset.WEEK_AGO
+                ).forEach { preset ->
+                    FilterChip(
+                        selected = selectedDatePreset == preset,
+                        onClick = { selectedDatePreset = preset },
+                        label = { Text(preset.label) }
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Not") },
+                placeholder = { Text("Buluşma, arama veya mesaj notu") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) {
+                    Text("Vazgeç")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    enabled = enabled,
+                    onClick = {
+                        val timestamp = selectedDatePreset.resolveTimestamp() ?: System.currentTimeMillis()
+                        onSave(selectedType.key, note, timestamp)
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Kaydet")
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+    }
+}
+
+private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>): String {
+    return contactTypes.find { it.key == type }?.label ?: when (type) {
+        DefaultContactTypes.CALL -> "Arama"
+        DefaultContactTypes.MESSAGE -> "Mesaj"
+        DefaultContactTypes.MEETING -> "Buluşma"
+        else -> type
+    }
+}
+
+private fun formatShortDate(timestamp: Long): String {
+    return SimpleDateFormat("d MMM yyyy", Locale("tr", "TR")).format(Date(timestamp))
+}
