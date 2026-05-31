@@ -11,6 +11,14 @@
 .DS_Store
 /build
 /captures
+.build-outputs/
+*.apk
+*.aab
+*.jks
+*.keystore
+*.keystore.base64
+google-services.json
+secrets.properties
 .externalNativeBuild
 .cxx
 local.properties

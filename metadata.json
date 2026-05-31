@@ -1,6 +1,6 @@
 {
-  "name": "Network Manager",
-  "description": "Personal relationship network management application",
+  "name": "CircleKeep",
+  "description": "Local-first Android app for remembering personal check-ins",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
