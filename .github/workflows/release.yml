@@ -12,9 +12,6 @@ on:
         required: true
         default: false
         type: boolean
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: write
@@ -54,11 +51,8 @@ jobs:
         id: release_files
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_NAME="${{ inputs.tag }}"
-          else
-            TAG_NAME="${GITHUB_REF_NAME}"
-          fi
+          TAG_NAME="${{ github.event.inputs.tag }}"
+          PRERELEASE="${{ github.event.inputs.prerelease }}"
 
           mkdir -p release
           APK_PATH="release/CircleKeep-${TAG_NAME}-debug.apk"
@@ -69,10 +63,10 @@ jobs:
             echo "tag_name=$TAG_NAME"
             echo "apk_path=$APK_PATH"
             echo "checksum_path=${APK_PATH}.sha256"
+            echo "prerelease=$PRERELEASE"
           } >> "$GITHUB_OUTPUT"
 
       - name: Ensure release tag exists
-        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           TAG_NAME="${{ steps.release_files.outputs.tag_name }}"
@@ -101,7 +95,7 @@ EOF
           TAG_NAME: ${{ steps.release_files.outputs.tag_name }}
           APK_PATH: ${{ steps.release_files.outputs.apk_path }}
           CHECKSUM_PATH: ${{ steps.release_files.outputs.checksum_path }}
-          PRERELEASE: ${{ inputs.prerelease || false }}
+          PRERELEASE: ${{ steps.release_files.outputs.prerelease }}
         shell: bash
         run: |
           RELEASE_FLAGS=()
