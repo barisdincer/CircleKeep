@@ -83,11 +83,7 @@ jobs:
       - name: Create release notes
         shell: bash
         run: |
-          cat > release-notes.md <<EOF
-CircleKeep APK built from commit ${GITHUB_SHA}.
-
-This is a debug APK intended for direct device testing.
-EOF
+          printf 'CircleKeep APK built from commit %s.\n\nThis is a debug APK intended for direct device testing.\n' "$GITHUB_SHA" > release-notes.md
 
       - name: Publish GitHub release
         env:
