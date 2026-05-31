@@ -120,4 +120,44 @@ class NetworkRepositoryTest {
         assertFalse(result.success)
         assertEquals(listOf(type.key), repository.getContactTypeSnapshot().map { it.key })
     }
+
+    @Test
+    fun `initial interaction is logged when adding person`() = runBlocking {
+        val timestamp = 1_700_000_000_000L
+
+        val personId = repository.insertPerson(
+            person = Person(name = "Ayse", phoneNumber = "5321111111", waveId = null),
+            initialInteractionType = DefaultContactTypes.MESSAGE,
+            initialInteractionTimestamp = timestamp,
+            initialInteractionNote = "Hoş geldin konuştuk"
+        ).toInt()
+
+        val person = repository.getPeopleSnapshot().single()
+        val log = repository.getInteractionSnapshot().single()
+        assertEquals(personId, person.id)
+        assertEquals(timestamp, person.lastInteractionDate)
+        assertEquals(DefaultContactTypes.MESSAGE, log.type)
+        assertEquals("Hoş geldin konuştuk", log.note)
+    }
+
+    @Test
+    fun `batch interaction logs update every selected person`() = runBlocking {
+        val timestamp = 1_700_000_100_000L
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, lastInteractionDate = 1L))
+        repository.insertPerson(Person(id = 2, name = "Mehmet", phoneNumber = "5322222222", waveId = null, lastInteractionDate = 1L))
+
+        repository.logInteractions(
+            personIds = listOf(1, 2, 2),
+            type = DefaultContactTypes.MEETING,
+            note = "Kahvede buluştuk",
+            timestamp = timestamp
+        )
+
+        val people = repository.getPeopleSnapshot().sortedBy { it.id }
+        val logs = repository.getInteractionSnapshot().sortedBy { it.personId }
+        assertEquals(listOf(timestamp, timestamp), people.map { it.lastInteractionDate })
+        assertEquals(listOf(1, 2), logs.map { it.personId })
+        assertEquals(listOf(DefaultContactTypes.MEETING, DefaultContactTypes.MEETING), logs.map { it.type })
+        assertEquals(listOf("Kahvede buluştuk", "Kahvede buluştuk"), logs.map { it.note })
+    }
 }

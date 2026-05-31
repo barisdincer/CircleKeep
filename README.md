@@ -71,6 +71,12 @@ Core data currently lives in Room entities:
 
 Database migrations are explicit and non-destructive. Existing local data is migrated through the `1 -> 2 -> 3 -> 4 -> 5` chain instead of being wiped.
 
+### APK Install Notes
+
+GitHub release APKs are debug builds intended for direct device testing. The Android `applicationId` remains `com.barisdincer.networkmanager` so existing early Network Manager installs can be updated in place while the app name and Kotlin namespace use CircleKeep.
+
+The repository includes a stable test debug keystore only so release APKs can keep the same sideload update signature between builds. It is not a production signing key. Install APKs only from the project's official GitHub Releases; a future production distribution should use a private signing key and a documented upgrade path.
+
 ### KMP-Ready Direction
 
 CircleKeep should keep platform-specific code at the edges. Relationship rhythm rules, due/upcoming grouping, contact type behavior, backup DTOs, and import/export rules should remain portable Kotlin whenever practical. Android-only pieces such as Room, contacts, call-log access, notification actions, and Compose screens should act as platform adapters around that core.

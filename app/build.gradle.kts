@@ -10,16 +10,30 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.barisdincer.circlekeep"
+    // Keep the original install identity so existing Network Manager installs
+    // can be updated in place while the Kotlin namespace stays CircleKeep.
+    applicationId = "com.barisdincer.networkmanager"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "1.0.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  signingConfigs {
+    create("circleKeepDebug") {
+      storeFile = rootProject.file("debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
+  }
+
   buildTypes {
+    debug {
+      signingConfig = signingConfigs.getByName("circleKeepDebug")
+    }
     release {
       isCrunchPngs = false
       isMinifyEnabled = false

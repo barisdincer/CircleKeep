@@ -86,7 +86,7 @@ interface NetworkDao {
     suspend fun countPeopleWithPreferredContactType(key: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPerson(person: Person)
+    suspend fun insertPerson(person: Person): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPeople(people: List<Person>)
@@ -155,6 +155,14 @@ interface NetworkDao {
     suspend fun logInteractionAndUpdatePerson(log: InteractionLog) {
         insertInteractionLog(log)
         updateLastInteraction(log.personId, log.timestamp)
+    }
+
+    @Transaction
+    suspend fun logInteractionsAndUpdatePeople(logs: List<InteractionLog>) {
+        logs.forEach { log ->
+            insertInteractionLog(log)
+            updateLastInteraction(log.personId, log.timestamp)
+        }
     }
 
     @Transaction

@@ -1,26 +1,33 @@
 package com.barisdincer.circlekeep.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -120,42 +127,73 @@ private fun BottomNavigationBar(navController: NavHostController) {
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
         color = MaterialTheme.colorScheme.surface
     ) {
-        Column(modifier = Modifier.navigationBarsPadding()) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)
-            ) {
-                NavigationBarItem(
-                    selected = currentDestination == "dashboard",
-                    label = { Text("Bugün") },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Bugün") },
-                    onClick = { navController.navigateTopLevel("dashboard") }
-                )
-                NavigationBarItem(
-                    selected = currentDestination == "people",
-                    label = { Text("Kişiler") },
-                    icon = { Icon(Icons.Default.Group, contentDescription = "Kişiler") },
-                    onClick = { navController.navigateTopLevel("people") }
-                )
-                NavigationBarItem(
-                    selected = currentDestination == "waves",
-                    label = { Text("Gruplar") },
-                    icon = { Icon(Icons.Default.Group, contentDescription = "Gruplar") },
-                    onClick = { navController.navigateTopLevel("waves") }
-                )
-                NavigationBarItem(
-                    selected = currentDestination == "reports",
-                    label = { Text("Özet") },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Özet") },
-                    onClick = { navController.navigateTopLevel("reports") }
-                )
-            }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CompactNavItem(
+                selected = currentDestination == "dashboard",
+                label = "Bugün",
+                icon = Icons.Default.Dashboard,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigateTopLevel("dashboard") }
+            )
+            CompactNavItem(
+                selected = currentDestination == "people",
+                label = "Kişiler",
+                icon = Icons.Default.Group,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigateTopLevel("people") }
+            )
+            CompactNavItem(
+                selected = currentDestination == "waves",
+                label = "Gruplar",
+                icon = Icons.Default.Group,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigateTopLevel("waves") }
+            )
+            CompactNavItem(
+                selected = currentDestination == "reports",
+                label = "Özet",
+                icon = Icons.Default.DateRange,
+                modifier = Modifier.weight(1f),
+                onClick = { navController.navigateTopLevel("reports") }
+            )
         }
+    }
+}
+
+@Composable
+private fun CompactNavItem(
+    selected: Boolean,
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column(
+        modifier = modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(background)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp), tint = contentColor)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = contentColor)
     }
 }
 

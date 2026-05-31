@@ -103,7 +103,7 @@ class DailyNotificationReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_menu_call, "Temas ettim", calledPendingIntent)
+            .addAction(android.R.drawable.ic_menu_call, "Aradım", calledPendingIntent)
             .addAction(android.R.drawable.ic_menu_recent_history, "Yarın", snoozePendingIntent)
 
         notificationManager.notify(ReminderActions.NOTIFICATION_ID, builder.build())

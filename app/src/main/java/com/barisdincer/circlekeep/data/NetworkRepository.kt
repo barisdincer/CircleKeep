@@ -103,8 +103,30 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         return RepositoryActionResult(true, "Grup kaldırıldı.")
     }
 
-    suspend fun insertPerson(person: Person) {
-        networkDao.insertPerson(person.withNormalizedPhone())
+    suspend fun insertPerson(person: Person): Long {
+        return networkDao.insertPerson(person.withNormalizedPhone())
+    }
+
+    suspend fun insertPerson(
+        person: Person,
+        initialInteractionType: String?,
+        initialInteractionTimestamp: Long?,
+        initialInteractionNote: String = ""
+    ): Long {
+        val personId = insertPerson(
+            person.withNormalizedPhone().copy(
+                lastInteractionDate = initialInteractionTimestamp ?: person.lastInteractionDate
+            )
+        ).toInt()
+        if (personId > 0 && initialInteractionType != null && initialInteractionTimestamp != null) {
+            logInteraction(
+                personId = personId,
+                type = initialInteractionType,
+                note = initialInteractionNote,
+                timestamp = initialInteractionTimestamp
+            )
+        }
+        return personId.toLong()
     }
 
     suspend fun insertPeople(people: List<Person>) {
@@ -128,6 +150,19 @@ class NetworkRepository(private val networkDao: NetworkDao) {
     ) {
         val log = InteractionLog(personId = personId, timestamp = timestamp, type = type, note = note.trim())
         networkDao.logInteractionAndUpdatePerson(log)
+    }
+
+    suspend fun logInteractions(
+        personIds: List<Int>,
+        type: String,
+        note: String = "",
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        val logs = personIds.distinct().filter { it > 0 }.map { personId ->
+            InteractionLog(personId = personId, timestamp = timestamp, type = type, note = note.trim())
+        }
+        if (logs.isEmpty()) return
+        networkDao.logInteractionsAndUpdatePeople(logs)
     }
 
     suspend fun logPreferredInteraction(personId: Int, note: String = "") {

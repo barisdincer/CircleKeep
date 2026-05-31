@@ -33,8 +33,11 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     val interactions by viewModel.interactions.collectAsState()
     val contactTypes by viewModel.contactTypes.collectAsState()
     val activeContactTypes by viewModel.activeContactTypes.collectAsState()
+    val uiMessage by viewModel.uiMessage.collectAsState()
     val personInteractions = interactions.filter { it.personId == personId }.sortedByDescending { it.timestamp }
 
+    var editReminderEnabled by remember { mutableStateOf(person?.reminderEnabled ?: true) }
+    var editPreferredContactTypeKey by remember { mutableStateOf(person?.preferredContactTypeKey.orEmpty()) }
     var editNotes by remember { mutableStateOf(person?.notes ?: "") }
     var editTags by remember { mutableStateOf(person?.tags ?: "") }
     var editCustomFrequency by remember { mutableStateOf(person?.customFrequencyDays?.toString().orEmpty()) }
@@ -44,9 +47,12 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     var editImportantDate by remember { mutableStateOf(person?.importantDateMillis?.let { dateInputFormat().format(Date(it)) }.orEmpty()) }
     var typeExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(person) {
         if (person != null) {
+            editReminderEnabled = person.reminderEnabled
+            editPreferredContactTypeKey = person.preferredContactTypeKey
             editNotes = person.notes
             editTags = person.tags
             editCustomFrequency = person.customFrequencyDays?.toString().orEmpty()
@@ -55,6 +61,12 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
             editImportantLabel = person.importantDateLabel
             editImportantDate = person.importantDateMillis?.let { dateInputFormat().format(Date(it)) }.orEmpty()
         }
+    }
+
+    LaunchedEffect(uiMessage) {
+        val message = uiMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearUiMessage()
     }
 
     if (person == null) {
@@ -67,6 +79,7 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(person.name) },
@@ -86,28 +99,28 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                     IconButton(onClick = {
                          val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phoneNumber}"))
                          context.startActivity(intent)
-                    }, modifier = Modifier.size(56.dp)) {
-                        Icon(Icons.Default.Call, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                    }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Call, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     }
                     IconButton(onClick = {
                          val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person.phoneNumber}"))
                          context.startActivity(intent)
-                    }, modifier = Modifier.size(56.dp)) {
-                        Icon(Icons.Default.Sms, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                    }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Sms, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     }
                     IconButton(onClick = {
                          val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
                          context.startActivity(intent)
-                    }, modifier = Modifier.size(56.dp)) {
-                        Icon(Icons.Default.Email, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                    }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Email, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     }
                 }
             }
@@ -124,23 +137,21 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Hatırlatmalar", fontWeight = FontWeight.Medium)
                                 Text(
-                                    if (person.reminderEnabled) "Hal hatır listesinde" else "Bu kişi için duraklatıldı",
+                                    if (editReminderEnabled) "Hal hatır listesinde" else "Bu kişi için duraklatıldı",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Switch(
-                                checked = person.reminderEnabled,
-                                onCheckedChange = {
-                                    viewModel.updatePerson(person.copy(reminderEnabled = it))
-                                }
+                                checked = editReminderEnabled,
+                                onCheckedChange = { editReminderEnabled = it }
                             )
                         }
                         ExposedDropdownMenuBox(
                             expanded = typeExpanded,
                             onExpandedChange = { typeExpanded = !typeExpanded }
                         ) {
-                            val currentType = contactTypes.find { it.key == person.preferredContactTypeKey }
+                            val currentType = contactTypes.find { it.key == editPreferredContactTypeKey }
                                 ?: activeContactTypes.firstOrNull()
                             OutlinedTextField(
                                 value = currentType?.label ?: "Arama",
@@ -158,7 +169,7 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                                     DropdownMenuItem(
                                         text = { Text(type.label) },
                                         onClick = {
-                                            viewModel.updatePerson(person.copy(preferredContactTypeKey = type.key))
+                                            editPreferredContactTypeKey = type.key
                                             typeExpanded = false
                                         }
                                     )
@@ -169,7 +180,6 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                             value = editCustomFrequency,
                             onValueChange = {
                                 editCustomFrequency = it.filter { char -> char.isDigit() }
-                                viewModel.updatePerson(person.copy(customFrequencyDays = editCustomFrequency.toIntOrNull()?.takeIf { days -> days > 0 }))
                             },
                             label = { Text("Kişiye özel ritim") },
                             modifier = Modifier.fillMaxWidth(),
@@ -186,14 +196,27 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                         }
                         OutlinedTextField(
                             value = editTags,
-                            onValueChange = {
-                                editTags = it
-                                viewModel.updatePerson(person.copy(tags = it))
-                            },
+                            onValueChange = { editTags = it },
                             label = { Text("Etiketler") },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Aile, okul, iş") }
                         )
+                        Button(
+                            onClick = {
+                                viewModel.updatePerson(
+                                    person.copy(
+                                        reminderEnabled = editReminderEnabled,
+                                        preferredContactTypeKey = editPreferredContactTypeKey.ifBlank { person.preferredContactTypeKey },
+                                        customFrequencyDays = editCustomFrequency.toIntOrNull()?.takeIf { days -> days > 0 },
+                                        tags = editTags
+                                    )
+                                )
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Ritmi kaydet")
+                        }
                     }
                 }
             }
@@ -204,30 +227,21 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                         Text("Son temas hafızası", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         OutlinedTextField(
                             value = editNextHint,
-                            onValueChange = {
-                                editNextHint = it
-                                viewModel.updatePerson(person.copy(nextConversationHint = it))
-                            },
+                            onValueChange = { editNextHint = it },
                             label = { Text("Bir dahaki sefere sor") },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Nasıl gidiyor, yeni iş nasıl?") }
                         )
                         OutlinedTextField(
                             value = editNotes,
-                            onValueChange = {
-                                editNotes = it
-                                viewModel.updatePerson(person.copy(notes = it))
-                            },
+                            onValueChange = { editNotes = it },
                             label = { Text("Notlar") },
                             modifier = Modifier.fillMaxWidth().height(120.dp),
                             maxLines = 5
                         )
                         OutlinedTextField(
                             value = editMemoryNotes,
-                            onValueChange = {
-                                editMemoryNotes = it
-                                viewModel.updatePerson(person.copy(memoryNotes = it))
-                            },
+                            onValueChange = { editMemoryNotes = it },
                             label = { Text("Hafıza notu") },
                             modifier = Modifier.fillMaxWidth().height(120.dp),
                             maxLines = 5,
@@ -236,26 +250,44 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 value = editImportantLabel,
-                                onValueChange = {
-                                    editImportantLabel = it
-                                    viewModel.updatePerson(person.copy(importantDateLabel = it))
-                                },
+                                onValueChange = { editImportantLabel = it },
                                 label = { Text("Önemli tarih") },
                                 modifier = Modifier.weight(1f),
                                 placeholder = { Text("Doğum günü") }
                             )
                             OutlinedTextField(
                                 value = editImportantDate,
-                                onValueChange = {
-                                    editImportantDate = it
-                                    val millis = parseDateInput(it)
-                                    if (it.isBlank() || millis != null) {
-                                        viewModel.updatePerson(person.copy(importantDateMillis = millis))
-                                    }
-                                },
+                                onValueChange = { editImportantDate = it },
                                 label = { Text("Tarih") },
                                 modifier = Modifier.weight(1f),
                                 placeholder = { Text("2026-06-15") }
+                            )
+                        }
+                        val parsedImportantDate = parseDateInput(editImportantDate)
+                        val canSaveMemory = editImportantDate.isBlank() || parsedImportantDate != null
+                        Button(
+                            enabled = canSaveMemory,
+                            onClick = {
+                                viewModel.updatePerson(
+                                    person.copy(
+                                        nextConversationHint = editNextHint,
+                                        notes = editNotes,
+                                        memoryNotes = editMemoryNotes,
+                                        importantDateLabel = editImportantLabel,
+                                        importantDateMillis = parsedImportantDate
+                                    )
+                                )
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Hafızayı kaydet")
+                        }
+                        if (!canSaveMemory) {
+                            Text(
+                                "Tarih biçimi 2026-06-15 gibi olmalı.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
                             )
                         }
                     }

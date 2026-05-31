@@ -26,8 +26,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.barisdincer.circlekeep.data.ContactDatePreset
+import com.barisdincer.circlekeep.data.ContactType
+import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
+import com.barisdincer.circlekeep.data.resolveTimestamp
 import com.barisdincer.circlekeep.device.PhonebookContact
 import com.barisdincer.circlekeep.device.PhonebookReader
 import com.barisdincer.circlekeep.ui.NetworkViewModel
@@ -40,11 +44,14 @@ import java.util.Locale
 fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
     val people by viewModel.people.collectAsState()
     val waves by viewModel.waves.collectAsState()
+    val activeContactTypes by viewModel.activeContactTypes.collectAsState()
     val uniqueTags by viewModel.uniqueTags.collectAsState()
+    val uiMessage by viewModel.uiMessage.collectAsState()
     var selectedTag by remember { mutableStateOf<String?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
     var showBulkImportDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val filteredPeople = if (selectedTag != null) {
         people.filter { it.tags.contains(selectedTag!!, ignoreCase = true) }
@@ -60,9 +67,16 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
         }
     }
 
+    LaunchedEffect(uiMessage) {
+        val message = uiMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearUiMessage()
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -105,9 +119,9 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 12.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 if (uniqueTags.isNotEmpty()) {
@@ -145,28 +159,28 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(44.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = person.name.take(1).uppercase(),
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(person.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(person.phoneNumber.ifEmpty { "Telefon yok" }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -181,7 +195,7 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
                             ) {
                                 Text(
                                     text = wave.name,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                                     fontWeight = FontWeight.Bold
@@ -196,9 +210,18 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
         if (showAddDialog) {
             AddPersonDialog(
                 waves = waves,
+                contactTypes = activeContactTypes,
                 onDismiss = { showAddDialog = false },
-                onAdd = { name, phone, waveId, contactLookupKey ->
-                    viewModel.addPerson(name, phone, waveId, contactLookupKey)
+                onAdd = { name, phone, waveId, contactLookupKey, initialType, initialTimestamp, initialNote ->
+                    viewModel.addPerson(
+                        name = name,
+                        phoneNumber = phone,
+                        waveId = waveId,
+                        contactLookupKey = contactLookupKey,
+                        initialInteractionType = initialType,
+                        initialInteractionTimestamp = initialTimestamp,
+                        initialInteractionNote = initialNote
+                    )
                     showAddDialog = false
                 }
             )
@@ -374,14 +397,24 @@ fun BulkImportContactsDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, String, Int?, String?) -> Unit) {
+fun AddPersonDialog(
+    waves: List<Wave>,
+    contactTypes: List<ContactType>,
+    onDismiss: () -> Unit,
+    onAdd: (String, String, Int?, String?, String?, Long?, String) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var contactLookupKey by remember { mutableStateOf<String?>(null) }
     var selectedWaveId by remember { mutableStateOf<Int?>(null) }
+    val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
+    var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
+    var initialDatePreset by remember { mutableStateOf(ContactDatePreset.TODAY) }
+    var initialNote by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var typeExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri: Uri? ->
@@ -399,11 +432,26 @@ fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, St
         }
     }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Kişi ekle", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Kişi ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    "Son ne zaman temas ettiğini seçersen ritim bugünden doğru hesaplanır.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
                 Button(
                     onClick = {
                         when (PackageManager.PERMISSION_GRANTED) {
@@ -415,7 +463,7 @@ fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, St
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
                 ) {
@@ -424,7 +472,7 @@ fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, St
                     Text("Rehberden seç", fontWeight = FontWeight.Bold)
                 }
 
-                HorizontalDivider()
+            HorizontalDivider()
 
                 OutlinedTextField(
                     value = name,
@@ -480,25 +528,103 @@ fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, St
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onAdd(name, phone, selectedWaveId, contactLookupKey)
+
+            ExposedDropdownMenuBox(
+                expanded = typeExpanded,
+                onExpandedChange = { typeExpanded = !typeExpanded }
+            ) {
+                val selectedType = typeOptions.find { it.key == selectedTypeKey } ?: typeOptions.first()
+                OutlinedTextField(
+                    value = selectedType.label,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Varsayılan iletişim türü") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = typeExpanded,
+                    onDismissRequest = { typeExpanded = false }
+                ) {
+                    typeOptions.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.label) },
+                            onClick = {
+                                selectedTypeKey = type.key
+                                typeExpanded = false
+                            }
+                        )
                     }
                 }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Son temas", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(
+                        ContactDatePreset.TODAY,
+                        ContactDatePreset.YESTERDAY,
+                        ContactDatePreset.THREE_DAYS_AGO,
+                        ContactDatePreset.WEEK_AGO,
+                        ContactDatePreset.NONE
+                    ).forEach { preset ->
+                        FilterChip(
+                            selected = initialDatePreset == preset,
+                            onClick = { initialDatePreset = preset },
+                            label = { Text(if (preset == ContactDatePreset.TODAY) "Bugünden başlat" else preset.label) }
+                        )
+                    }
+                }
+            }
+
+            if (initialDatePreset != ContactDatePreset.NONE) {
+                OutlinedTextField(
+                    value = initialNote,
+                    onValueChange = { initialNote = it },
+                    label = { Text("İlk temas notu") },
+                    placeholder = { Text("İsteğe bağlı") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Kaydet")
+                TextButton(onClick = onDismiss) {
+                    Text("Vazgeç")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                            val timestamp = initialDatePreset.resolveTimestamp()
+                            onAdd(
+                                name,
+                                phone,
+                                selectedWaveId,
+                                contactLookupKey,
+                                if (timestamp == null) null else selectedTypeKey,
+                                timestamp,
+                                initialNote
+                            )
+                    }
+                    },
+                    enabled = name.isNotBlank(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Kaydet")
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Vazgeç")
-            }
+            Spacer(modifier = Modifier.height(10.dp))
         }
-    )
+    }
 }
 
 data class ContactDetails(

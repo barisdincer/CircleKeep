@@ -16,6 +16,7 @@
 *.aab
 *.jks
 *.keystore
+!debug.keystore
 *.keystore.base64
 google-services.json
 secrets.properties
@@ -23,4 +24,3 @@ secrets.properties
 .cxx
 local.properties
 .env
-debug.keystore

@@ -34,6 +34,9 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
     private val _managementMessage = MutableStateFlow<String?>(null)
     val managementMessage: StateFlow<String?> = _managementMessage.asStateFlow()
 
+    private val _uiMessage = MutableStateFlow<String?>(null)
+    val uiMessage: StateFlow<String?> = _uiMessage.asStateFlow()
+
     val contactTypes: StateFlow<List<ContactType>> = repository.allContactTypes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -128,7 +131,13 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
 
     fun addContactType(label: String) {
         viewModelScope.launch {
-            repository.insertContactType(label)
+            val trimmedLabel = label.trim()
+            if (trimmedLabel.isBlank()) {
+                _managementMessage.value = "İletişim türü adı boş olamaz."
+                return@launch
+            }
+            repository.insertContactType(trimmedLabel)
+            _managementMessage.value = "$trimmedLabel eklendi."
         }
     }
 
@@ -152,7 +161,13 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
 
     fun addWave(name: String, frequencyDays: Int) {
         viewModelScope.launch {
-            repository.insertWave(Wave(name = name.trim(), frequencyDays = frequencyDays))
+            val trimmedName = name.trim()
+            if (trimmedName.isBlank() || frequencyDays <= 0) {
+                _managementMessage.value = "Grup adı ve gün sayısı geçerli olmalı."
+                return@launch
+            }
+            repository.insertWave(Wave(name = trimmedName, frequencyDays = frequencyDays))
+            _managementMessage.value = "$trimmedName eklendi."
         }
     }
 
@@ -172,34 +187,71 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         _managementMessage.value = null
     }
 
-    fun addPerson(name: String, phoneNumber: String, waveId: Int?, contactLookupKey: String? = null) {
+    fun addPerson(
+        name: String,
+        phoneNumber: String,
+        waveId: Int?,
+        contactLookupKey: String? = null,
+        initialInteractionType: String? = null,
+        initialInteractionTimestamp: Long? = null,
+        initialInteractionNote: String = ""
+    ) {
         viewModelScope.launch {
+            val trimmedName = name.trim()
+            if (trimmedName.isBlank()) {
+                _uiMessage.value = "Kişi adı boş olamaz."
+                return@launch
+            }
             repository.insertPerson(
-                Person(
-                    name = name,
+                person = Person(
+                    name = trimmedName,
                     phoneNumber = phoneNumber,
                     contactLookupKey = contactLookupKey,
                     waveId = waveId
-                )
+                ),
+                initialInteractionType = initialInteractionType,
+                initialInteractionTimestamp = initialInteractionTimestamp,
+                initialInteractionNote = initialInteractionNote
             )
+            _uiMessage.value = "$trimmedName kaydedildi."
         }
     }
 
     fun addPeople(people: List<Person>) {
         viewModelScope.launch {
             repository.insertPeople(people)
+            _uiMessage.value = "${people.size} kişi içe aktarıldı."
         }
     }
 
     fun updatePerson(person: Person) {
         viewModelScope.launch {
             repository.updatePerson(person)
+            _uiMessage.value = "${person.name} güncellendi."
         }
     }
 
-    fun logInteraction(personId: Int, type: String, note: String = "") {
+    fun logInteraction(
+        personId: Int,
+        type: String,
+        note: String = "",
+        timestamp: Long = System.currentTimeMillis()
+    ) {
         viewModelScope.launch {
-            repository.logInteraction(personId, type, note)
+            repository.logInteraction(personId, type, note, timestamp)
+            _uiMessage.value = "Temas kaydedildi."
+        }
+    }
+
+    fun logInteractions(
+        personIds: List<Int>,
+        type: String,
+        note: String = "",
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        viewModelScope.launch {
+            repository.logInteractions(personIds, type, note, timestamp)
+            _uiMessage.value = "${personIds.distinct().size} kişi için temas kaydedildi."
         }
     }
 
@@ -213,6 +265,7 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
                 set(Calendar.MILLISECOND, 0)
             }
             repository.snoozePerson(personId, calendar.timeInMillis)
+            _uiMessage.value = "Yarın tekrar hatırlatılacak."
         }
     }
 
@@ -271,6 +324,10 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
                 _backupState.value = BackupUiState(message = "Geri yükleme başarısız: ${it.message}")
             }
         }
+    }
+
+    fun clearUiMessage() {
+        _uiMessage.value = null
     }
 }
 
