@@ -1,22 +1,28 @@
 package com.barisdincer.circlekeep.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -26,14 +32,20 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.barisdincer.circlekeep.NetworkApplication
+import com.barisdincer.circlekeep.data.UserPreferences
+import com.barisdincer.circlekeep.preferences.UserPreferencesStore
 import com.barisdincer.circlekeep.ui.dashboard.DashboardScreen
 import com.barisdincer.circlekeep.ui.people.PeopleScreen
 import com.barisdincer.circlekeep.ui.people.PersonDetailScreen
+import com.barisdincer.circlekeep.ui.profile.ProfileScreen
 import com.barisdincer.circlekeep.ui.reports.ReportsScreen
 import com.barisdincer.circlekeep.ui.waves.WavesScreen
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    userPreferences: UserPreferences,
+    preferencesStore: UserPreferencesStore
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val application = context.applicationContext as NetworkApplication
@@ -42,6 +54,11 @@ fun AppNavigation() {
     )
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         bottomBar = {
             BottomNavigationBar(navController = navController)
         }
@@ -49,10 +66,17 @@ fun AppNavigation() {
         NavHost(
             navController = navController,
             startDestination = "dashboard",
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(paddingValues)
         ) {
             composable("dashboard") {
-                DashboardScreen(viewModel)
+                DashboardScreen(
+                    viewModel = viewModel,
+                    userPreferences = userPreferences,
+                    onProfileClick = { navController.navigate("profile") }
+                )
             }
             composable("people") {
                 PeopleScreen(
@@ -67,6 +91,14 @@ fun AppNavigation() {
             }
             composable("reports") {
                 ReportsScreen(viewModel)
+            }
+            composable("profile") {
+                ProfileScreen(
+                    preferences = userPreferences,
+                    onBack = { navController.popBackStack() },
+                    onSaveProfile = preferencesStore::updateProfile,
+                    onThemeModeChange = preferencesStore::updateThemeMode
+                )
             }
             composable(
                 route = "person_detail/{personId}",
@@ -87,36 +119,42 @@ fun AppNavigation() {
 private fun BottomNavigationBar(navController: NavHostController) {
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route
 
-    Column {
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ) {
-            NavigationBarItem(
-                selected = currentDestination == "dashboard",
-                label = { Text("Bugün") },
-                icon = { Icon(Icons.Default.Dashboard, contentDescription = "Bugün") },
-                onClick = { navController.navigateTopLevel("dashboard") }
-            )
-            NavigationBarItem(
-                selected = currentDestination == "people",
-                label = { Text("Kişiler") },
-                icon = { Icon(Icons.Default.Group, contentDescription = "Kişiler") },
-                onClick = { navController.navigateTopLevel("people") }
-            )
-            NavigationBarItem(
-                selected = currentDestination == "waves",
-                label = { Text("Döngüler") },
-                icon = { Icon(Icons.Default.Waves, contentDescription = "Döngüler") },
-                onClick = { navController.navigateTopLevel("waves") }
-            )
-            NavigationBarItem(
-                selected = currentDestination == "reports",
-                label = { Text("Özet") },
-                icon = { Icon(Icons.Default.DateRange, contentDescription = "Özet") },
-                onClick = { navController.navigateTopLevel("reports") }
-            )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.navigationBarsPadding()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)
+            ) {
+                NavigationBarItem(
+                    selected = currentDestination == "dashboard",
+                    label = { Text("Bugün") },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Bugün") },
+                    onClick = { navController.navigateTopLevel("dashboard") }
+                )
+                NavigationBarItem(
+                    selected = currentDestination == "people",
+                    label = { Text("Kişiler") },
+                    icon = { Icon(Icons.Default.Group, contentDescription = "Kişiler") },
+                    onClick = { navController.navigateTopLevel("people") }
+                )
+                NavigationBarItem(
+                    selected = currentDestination == "waves",
+                    label = { Text("Gruplar") },
+                    icon = { Icon(Icons.Default.Group, contentDescription = "Gruplar") },
+                    onClick = { navController.navigateTopLevel("waves") }
+                )
+                NavigationBarItem(
+                    selected = currentDestination == "reports",
+                    label = { Text("Özet") },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Özet") },
+                    onClick = { navController.navigateTopLevel("reports") }
+                )
+            }
         }
     }
 }

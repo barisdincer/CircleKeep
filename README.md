@@ -30,6 +30,7 @@ CircleKeep is designed as a local-first app:
 - The app does not use a backend service.
 - The app does not request internet access.
 - JSON backup and restore are user-initiated local file actions.
+- Local profile and theme preferences stay on the device and are not included in JSON backups yet.
 - Android Auto Backup is disabled so the app database is not silently backed up by the OS.
 - Contacts and call logs are read only after Android runtime permission prompts.
 
@@ -58,6 +59,7 @@ CircleKeep is a Kotlin Android app built with:
 - Room for local persistence.
 - Kotlin coroutines and Flow for reactive state.
 - Android contacts and call-log providers for optional device integrations.
+- SharedPreferences for local-only profile and theme preferences.
 - JSON export/import for portable local backups.
 
 Core data currently lives in Room entities:

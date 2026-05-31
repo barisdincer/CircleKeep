@@ -95,6 +95,39 @@ class NetworkDomainTest {
     }
 
     @Test
+    fun `next contacts excludes due people and returns closest ten`() {
+        val now = 100L * DAY_MILLIS
+        val group = Wave(id = 1, name = "Friends", frequencyDays = 30)
+        val people = (1..12).map { index ->
+            Person(
+                id = index,
+                name = "P$index",
+                phoneNumber = "53200000$index",
+                waveId = group.id,
+                lastInteractionDate = now - (index * DAY_MILLIS)
+            )
+        } + Person(
+            id = 99,
+            name = "Due",
+            phoneNumber = "5329999999",
+            waveId = group.id,
+            lastInteractionDate = now - 30L * DAY_MILLIS
+        )
+
+        val nextContacts = ContactReminderCalculator.nextContacts(
+            people = people,
+            waves = listOf(group),
+            currentTimeMillis = now,
+            limit = 10
+        )
+
+        assertEquals(10, nextContacts.size)
+        assertEquals((12 downTo 3).map { "P$it" }, nextContacts.map { it.person.name })
+        assertTrue(nextContacts.none { it.person.name == "Due" })
+        assertEquals(18L, -nextContacts.first().daysOverdue)
+    }
+
+    @Test
     fun `backup includes relationship rhythm and memory fields`() {
         val wave = Wave(id = 1, name = "Friends", frequencyDays = 21)
         val person = Person(

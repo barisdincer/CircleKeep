@@ -5,7 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import com.barisdincer.circlekeep.data.ThemeMode
 
 private val DarkColorScheme =
   darkColorScheme(
@@ -55,9 +55,14 @@ private val LightColorScheme =
 
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
+  themeMode: ThemeMode = ThemeMode.SYSTEM,
   content: @Composable () -> Unit,
 ) {
+  val darkTheme = when (themeMode) {
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+  }
   val colorScheme =
     when {
       darkTheme -> DarkColorScheme

@@ -2,9 +2,23 @@ package com.barisdincer.circlekeep.ui.dashboard
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
@@ -14,15 +28,38 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.PersonWithWave
 import java.text.SimpleDateFormat
@@ -31,7 +68,11 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(viewModel: NetworkViewModel) {
+fun DashboardScreen(
+    viewModel: NetworkViewModel,
+    userPreferences: UserPreferences,
+    onProfileClick: () -> Unit
+) {
     val dashboard by viewModel.dashboardReminders.collectAsState()
     val people by viewModel.people.collectAsState()
     val interactions by viewModel.interactions.collectAsState()
@@ -40,6 +81,8 @@ fun DashboardScreen(viewModel: NetworkViewModel) {
     val dueCount = dashboard.today.size + dashboard.overdue.size
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             Column {
                 TopAppBar(
@@ -55,11 +98,17 @@ fun DashboardScreen(viewModel: NetworkViewModel) {
                             modifier = Modifier
                                 .padding(end = 16.dp)
                                 .size(40.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickable(onClick = onProfileClick),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("CK", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Text(
+                                userPreferences.displayInitials,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -127,9 +176,9 @@ fun DashboardScreen(viewModel: NetworkViewModel) {
 
             item {
                 ReminderSectionHeader(
-                    title = "Yakında",
+                    title = "Sıradakiler",
                     count = dashboard.upcoming.size,
-                    emptyText = "Önümüzdeki hafta yaklaşan ritim yok."
+                    emptyText = "Sırada bekleyen ritim yok."
                 )
             }
             items(dashboard.upcoming) { contact ->
@@ -165,21 +214,30 @@ fun DashboardScreen(viewModel: NetworkViewModel) {
 }
 
 @Composable
-fun StatCard(label: String, value: String, icon: ImageVector, containerColor: androidx.compose.ui.graphics.Color, contentColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+fun StatCard(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
     Card(
         modifier = modifier.height(130.dp),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp).fillMaxHeight(),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxHeight(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f)),
+                    .background(Color.White.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = contentColor)
@@ -289,7 +347,7 @@ fun ContactReminderCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(contact.person.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "Döngü: ${contact.wave?.name ?: "Yok"} (${contact.effectiveFrequencyDays} gün) · ${contact.contactType.label}",
+                        "Grup: ${contact.wave?.name ?: "Yok"} (${contact.effectiveFrequencyDays} gün) · ${contact.actionTimingLabel()}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -317,7 +375,9 @@ fun ContactReminderCard(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = { onLogInteraction(contact.contactType.key, "") },
-                    modifier = Modifier.weight(1f).height(52.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.Call, contentDescription = contact.contactType.label)
@@ -326,7 +386,9 @@ fun ContactReminderCard(
                 }
                 FilledTonalButton(
                     onClick = { showNoteDialog = true },
-                    modifier = Modifier.weight(1f).height(52.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.EditNote, contentDescription = "Notla kaydet")
@@ -366,11 +428,11 @@ private fun ReminderStatusBadge(contact: PersonWithWave) {
         val status = when {
             contact.snoozedUntilDate != null -> {
                 val dateStr = SimpleDateFormat("d MMM", Locale("tr", "TR")).format(Date(contact.snoozedUntilDate))
-                "$dateStr"
+                dateStr
             }
             contact.daysOverdue > 0 -> "${contact.daysOverdue} gün geçti"
             contact.daysOverdue == 0L && contact.isDue -> "Bugün"
-            contact.daysOverdue < 0 -> "${-contact.daysOverdue} gün kaldı"
+            contact.daysOverdue < 0 -> "${-contact.daysOverdue} gün sonra"
             else -> "Takipte"
         }
         Text(
@@ -380,6 +442,17 @@ private fun ReminderStatusBadge(contact: PersonWithWave) {
             fontWeight = FontWeight.Bold
         )
     }
+}
+
+private fun PersonWithWave.actionTimingLabel(): String {
+    val timing = when {
+        snoozedUntilDate != null -> "Ertelendi"
+        daysOverdue > 0 -> "${daysOverdue} gün gecikti"
+        daysOverdue == 0L && isDue -> "Bugün"
+        daysOverdue < 0 -> "${-daysOverdue} gün sonra"
+        else -> "Takipte"
+    }
+    return "$timing · ${contactType.label}"
 }
 
 @Composable
