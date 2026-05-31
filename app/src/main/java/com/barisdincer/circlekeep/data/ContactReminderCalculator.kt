@@ -45,6 +45,20 @@ object ContactReminderCalculator {
         withinDays: Int = 7,
         currentTimeMillis: Long = System.currentTimeMillis()
     ): List<DueContact> {
+        return nextContacts(
+            people = people,
+            waves = waves,
+            currentTimeMillis = currentTimeMillis,
+            limit = Int.MAX_VALUE
+        ).filter { -it.daysOverdue in 1..withinDays }
+    }
+
+    fun nextContacts(
+        people: List<Person>,
+        waves: List<Wave>,
+        currentTimeMillis: Long = System.currentTimeMillis(),
+        limit: Int = 10
+    ): List<DueContact> {
         return people.mapNotNull { person ->
             if (!person.reminderEnabled) return@mapNotNull null
             if ((person.snoozedUntilDate ?: 0L) > currentTimeMillis) return@mapNotNull null
@@ -53,7 +67,7 @@ object ContactReminderCalculator {
             val frequencyDays = person.customFrequencyDays?.takeIf { it > 0 } ?: wave.frequencyDays
             val daysSince = (currentTimeMillis - person.lastInteractionDate) / DAY_MILLIS
             val daysUntilDue = frequencyDays - daysSince
-            if (daysUntilDue !in 1..withinDays) return@mapNotNull null
+            if (daysUntilDue <= 0) return@mapNotNull null
 
             DueContact(
                 person = person,
@@ -62,6 +76,9 @@ object ContactReminderCalculator {
                 daysSinceLastInteraction = daysSince,
                 daysOverdue = -daysUntilDue
             )
-        }.sortedByDescending { it.daysOverdue }
+        }.sortedWith(
+            compareBy<DueContact> { -it.daysOverdue }
+                .thenBy { it.person.name }
+        ).take(limit.coerceAtLeast(0))
     }
 }

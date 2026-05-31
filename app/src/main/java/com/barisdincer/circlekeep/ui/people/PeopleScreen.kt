@@ -61,6 +61,8 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             Column {
                 TopAppBar(
@@ -259,12 +261,12 @@ fun BulkImportContactsDialog(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
                 ) {
-                    val selectedWaveName = waves.find { it.id == selectedWaveId }?.name ?: "Hatırlatma döngüsü yok"
+                    val selectedWaveName = waves.find { it.id == selectedWaveId }?.name ?: "Hatırlatma grubu yok"
                     OutlinedTextField(
                         value = selectedWaveName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Hatırlatma döngüsü") },
+                        label = { Text("Hatırlatma grubu") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -275,7 +277,7 @@ fun BulkImportContactsDialog(
                         onDismissRequest = { expanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Hatırlatma döngüsü yok") },
+                            text = { Text("Hatırlatma grubu yok") },
                             onClick = {
                                 selectedWaveId = null
                                 expanded = false
@@ -443,12 +445,12 @@ fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, St
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
                 ) {
-                    val selectedWaveName = waves.find { it.id == selectedWaveId }?.name ?: "Döngü seç"
+                    val selectedWaveName = waves.find { it.id == selectedWaveId }?.name ?: "Grup seç"
                     OutlinedTextField(
                         value = selectedWaveName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Döngü") },
+                        label = { Text("Grup") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         shape = RoundedCornerShape(8.dp),
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
@@ -461,7 +463,7 @@ fun AddPersonDialog(waves: List<Wave>, onDismiss: () -> Unit, onAdd: (String, St
                         onDismissRequest = { expanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Döngü yok") },
+                            text = { Text("Grup yok") },
                             onClick = {
                                 selectedWaveId = null
                                 expanded = false

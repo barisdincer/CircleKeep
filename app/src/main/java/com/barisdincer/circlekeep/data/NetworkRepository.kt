@@ -40,8 +40,43 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         networkDao.setContactTypeActive(key, isActive)
     }
 
+    suspend fun deleteContactTypeIfUnused(key: String): RepositoryActionResult {
+        if (key.isBlank()) {
+            return RepositoryActionResult(false, "İletişim türü bulunamadı.")
+        }
+
+        val type = networkDao.getContactTypeByKey(key)
+            ?: return RepositoryActionResult(false, "İletişim türü bulunamadı.")
+        val peopleCount = networkDao.countPeopleWithPreferredContactType(key)
+        val logCount = networkDao.countInteractionLogsByType(key)
+        if (peopleCount > 0 || logCount > 0) {
+            return RepositoryActionResult(
+                success = false,
+                message = "Bu tür kişi tercihlerinde veya geçmişte kullanılıyor; önce kullanımı kaldırmalısın."
+            )
+        }
+
+        if (type.isDefault) {
+            networkDao.setContactTypeActive(key, false)
+        } else {
+            networkDao.deleteContactTypeByKey(key)
+        }
+        return RepositoryActionResult(true, "${type.label} kaldırıldı.")
+    }
+
     suspend fun insertWave(wave: Wave) {
-        networkDao.insertWave(wave)
+        val trimmedName = wave.name.trim()
+        if (trimmedName.isBlank() || wave.frequencyDays <= 0) return
+        networkDao.insertWave(wave.copy(name = trimmedName))
+    }
+
+    suspend fun updateWave(wave: Wave): RepositoryActionResult {
+        val trimmedName = wave.name.trim()
+        if (trimmedName.isBlank() || wave.frequencyDays <= 0) {
+            return RepositoryActionResult(false, "Grup adı ve gün sayısı geçerli olmalı.")
+        }
+        networkDao.updateWave(wave.copy(name = trimmedName))
+        return RepositoryActionResult(true, "$trimmedName güncellendi.")
     }
 
     suspend fun ensureDefaultWaves() {
@@ -56,8 +91,16 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         )
     }
 
-    suspend fun deleteWave(id: Int) {
+    suspend fun deleteWaveIfUnused(id: Int): RepositoryActionResult {
+        val peopleCount = networkDao.countPeopleInWave(id)
+        if (peopleCount > 0) {
+            return RepositoryActionResult(
+                success = false,
+                message = "Bu grupta $peopleCount kişi var; silmeden önce kişileri başka gruba taşımalısın."
+            )
+        }
         networkDao.deleteWaveById(id)
+        return RepositoryActionResult(true, "Grup kaldırıldı.")
     }
 
     suspend fun insertPerson(person: Person) {

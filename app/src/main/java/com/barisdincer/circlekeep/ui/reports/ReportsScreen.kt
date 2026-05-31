@@ -57,6 +57,8 @@ fun ReportsScreen(viewModel: NetworkViewModel) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             Column {
                 TopAppBar(
@@ -156,7 +158,7 @@ fun ReportsScreen(viewModel: NetworkViewModel) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         val active = people.count { it.waveId != null }
-                        Text("Döngüde", style = MaterialTheme.typography.bodySmall)
+                        Text("Grupta", style = MaterialTheme.typography.bodySmall)
                         Text("$active", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     }
                 }

@@ -65,6 +65,8 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             TopAppBar(
                 title = { Text(person.name) },
@@ -171,7 +173,7 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                             },
                             label = { Text("Kişiye özel ritim") },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Boşsa döngü gün sayısı kullanılır") },
+                            placeholder = { Text("Boşsa grup gün sayısı kullanılır") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
                         person.lastCallLogSyncDate?.let { syncDate ->

@@ -20,6 +20,9 @@ interface NetworkDao {
     @Query("SELECT * FROM contact_types ORDER BY sortOrder ASC, label ASC")
     suspend fun getContactTypeSnapshot(): List<ContactType>
 
+    @Query("SELECT * FROM contact_types WHERE `key` = :key LIMIT 1")
+    suspend fun getContactTypeByKey(key: String): ContactType?
+
     @Query("SELECT COUNT(*) FROM contact_types")
     suspend fun getContactTypeCount(): Int
 
@@ -38,6 +41,9 @@ interface NetworkDao {
     @Query("UPDATE contact_types SET isActive = :isActive WHERE `key` = :key")
     suspend fun setContactTypeActive(key: String, isActive: Boolean)
 
+    @Query("DELETE FROM contact_types WHERE `key` = :key")
+    suspend fun deleteContactTypeByKey(key: String)
+
     // Waves
     @Query("SELECT * FROM waves")
     fun getAllWaves(): Flow<List<Wave>>
@@ -54,6 +60,9 @@ interface NetworkDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWaves(waves: List<Wave>)
 
+    @Update
+    suspend fun updateWave(wave: Wave)
+
     @Query("DELETE FROM waves WHERE id = :id")
     suspend fun deleteWaveById(id: Int)
 
@@ -69,6 +78,12 @@ interface NetworkDao {
 
     @Query("SELECT * FROM people WHERE waveId = :waveId")
     fun getPeopleInWave(waveId: Int): Flow<List<Person>>
+
+    @Query("SELECT COUNT(*) FROM people WHERE waveId = :waveId")
+    suspend fun countPeopleInWave(waveId: Int): Int
+
+    @Query("SELECT COUNT(*) FROM people WHERE preferredContactTypeKey = :key")
+    suspend fun countPeopleWithPreferredContactType(key: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: Person)
@@ -119,6 +134,9 @@ interface NetworkDao {
 
     @Query("SELECT * FROM interaction_logs ORDER BY timestamp DESC")
     suspend fun getInteractionSnapshot(): List<InteractionLog>
+
+    @Query("SELECT COUNT(*) FROM interaction_logs WHERE type = :type")
+    suspend fun countInteractionLogsByType(type: String): Int
 
     @Query("DELETE FROM interaction_logs")
     suspend fun clearInteractionLogs()

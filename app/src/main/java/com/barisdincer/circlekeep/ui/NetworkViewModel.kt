@@ -31,6 +31,9 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
     private val _backupState = MutableStateFlow(BackupUiState())
     val backupState: StateFlow<BackupUiState> = _backupState.asStateFlow()
 
+    private val _managementMessage = MutableStateFlow<String?>(null)
+    val managementMessage: StateFlow<String?> = _managementMessage.asStateFlow()
+
     val contactTypes: StateFlow<List<ContactType>> = repository.allContactTypes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -59,7 +62,7 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         repository.allWaves,
         repository.allContactTypes
     ) { p, w, types ->
-        ContactReminderCalculator.dueContacts(p, w).map { dueContact ->
+        ContactReminderCalculator.nextContacts(p, w).map { dueContact ->
             PersonWithWave(
                 person = dueContact.person,
                 wave = dueContact.wave,
@@ -88,7 +91,7 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
                 daysOverdue = dueContact.daysOverdue
             )
         }
-        val upcoming = ContactReminderCalculator.upcomingContacts(people, waves).map { dueContact ->
+        val upcoming = ContactReminderCalculator.nextContacts(people, waves, limit = 10).map { dueContact ->
             PersonWithWave(
                 person = dueContact.person,
                 wave = dueContact.wave,
@@ -141,10 +144,32 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
+    fun deleteContactType(key: String) {
+        viewModelScope.launch {
+            _managementMessage.value = repository.deleteContactTypeIfUnused(key).message
+        }
+    }
+
     fun addWave(name: String, frequencyDays: Int) {
         viewModelScope.launch {
-            repository.insertWave(Wave(name = name, frequencyDays = frequencyDays))
+            repository.insertWave(Wave(name = name.trim(), frequencyDays = frequencyDays))
         }
+    }
+
+    fun updateWave(wave: Wave) {
+        viewModelScope.launch {
+            _managementMessage.value = repository.updateWave(wave).message
+        }
+    }
+
+    fun deleteWave(id: Int) {
+        viewModelScope.launch {
+            _managementMessage.value = repository.deleteWaveIfUnused(id).message
+        }
+    }
+
+    fun clearManagementMessage() {
+        _managementMessage.value = null
     }
 
     fun addPerson(name: String, phoneNumber: String, waveId: Int?, contactLookupKey: String? = null) {
