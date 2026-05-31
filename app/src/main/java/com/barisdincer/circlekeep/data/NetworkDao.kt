@@ -10,6 +10,34 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NetworkDao {
+    // Contact types
+    @Query("SELECT * FROM contact_types ORDER BY sortOrder ASC, label ASC")
+    fun getAllContactTypes(): Flow<List<ContactType>>
+
+    @Query("SELECT * FROM contact_types WHERE isActive = 1 ORDER BY sortOrder ASC, label ASC")
+    fun getActiveContactTypes(): Flow<List<ContactType>>
+
+    @Query("SELECT * FROM contact_types ORDER BY sortOrder ASC, label ASC")
+    suspend fun getContactTypeSnapshot(): List<ContactType>
+
+    @Query("SELECT COUNT(*) FROM contact_types")
+    suspend fun getContactTypeCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertContactTypesIfMissing(types: List<ContactType>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactType(type: ContactType)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactTypes(types: List<ContactType>)
+
+    @Query("UPDATE contact_types SET label = :label WHERE `key` = :key")
+    suspend fun renameContactType(key: String, label: String)
+
+    @Query("UPDATE contact_types SET isActive = :isActive WHERE `key` = :key")
+    suspend fun setContactTypeActive(key: String, isActive: Boolean)
+
     // Waves
     @Query("SELECT * FROM waves")
     fun getAllWaves(): Flow<List<Wave>>
@@ -35,6 +63,9 @@ interface NetworkDao {
 
     @Query("SELECT * FROM people ORDER BY name ASC")
     suspend fun getPeopleSnapshot(): List<Person>
+
+    @Query("SELECT * FROM people WHERE id = :id LIMIT 1")
+    suspend fun getPersonById(id: Int): Person?
 
     @Query("SELECT * FROM people WHERE waveId = :waveId")
     fun getPeopleInWave(waveId: Int): Flow<List<Person>>
@@ -92,6 +123,9 @@ interface NetworkDao {
     @Query("DELETE FROM interaction_logs")
     suspend fun clearInteractionLogs()
 
+    @Query("DELETE FROM contact_types")
+    suspend fun clearContactTypes()
+
     @Query("DELETE FROM people")
     suspend fun clearPeople()
 
@@ -112,10 +146,17 @@ interface NetworkDao {
     }
 
     @Transaction
-    suspend fun replaceAllData(waves: List<Wave>, people: List<Person>, logs: List<InteractionLog>) {
+    suspend fun replaceAllData(
+        contactTypes: List<ContactType>,
+        waves: List<Wave>,
+        people: List<Person>,
+        logs: List<InteractionLog>
+    ) {
         clearInteractionLogs()
         clearPeople()
         clearWaves()
+        clearContactTypes()
+        insertContactTypes(contactTypes)
         insertWaves(waves)
         insertPeople(people)
         insertInteractionLogs(logs)

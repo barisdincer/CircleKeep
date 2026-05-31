@@ -1,5 +1,6 @@
 package com.barisdincer.circlekeep.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,9 +8,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.*
@@ -30,11 +32,12 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(viewModel: NetworkViewModel) {
-    val upcomingContacts by viewModel.upcomingContacts.collectAsState()
+    val dashboard by viewModel.dashboardReminders.collectAsState()
     val people by viewModel.people.collectAsState()
     val interactions by viewModel.interactions.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val context = LocalContext.current
+    val dueCount = dashboard.today.size + dashboard.overdue.size
 
     Scaffold(
         topBar = {
@@ -56,7 +59,7 @@ fun DashboardScreen(viewModel: NetworkViewModel) {
                                 .background(MaterialTheme.colorScheme.secondaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("HH", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Text("CK", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -73,99 +76,89 @@ fun DashboardScreen(viewModel: NetworkViewModel) {
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     StatCard("Rehber", "${people.size} kişi", Icons.Default.Group, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
-                    StatCard("Bugün", "${upcomingContacts.size} kişi", Icons.Default.Waves, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, Modifier.weight(1f))
+                    StatCard("Bekleyen", "$dueCount kişi", Icons.Default.Waves, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, Modifier.weight(1f))
                 }
             }
 
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text("Hal hatır ritmi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column {
-                                Text("Toplam temas", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
-                                Text("${interactions.size}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                val oneWeekAgo = System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000
-                                val recentCount = interactions.count { it.timestamp > oneWeekAgo }
-                                Text("Son 7 gün", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
-                                Text("$recentCount", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                syncState.message ?: "Arama kayıtları uygulama açıldığında kontrol edilir.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(
-                                enabled = !syncState.isSyncing,
-                                onClick = { viewModel.syncCallLog(context) }
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Aramaları eşle")
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (syncState.isSyncing) "Kontrol" else "Eşle")
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                Text(
-                    "Bugün hatırlanacaklar",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 0.dp)
+                RhythmSummaryCard(
+                    interactions = interactions.size,
+                    recentInteractions = interactions.count { it.timestamp > System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000 },
+                    syncMessage = syncState.message,
+                    isSyncing = syncState.isSyncing,
+                    onSync = { viewModel.syncCallLog(context) }
                 )
             }
 
-            if (upcomingContacts.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Bugün bekleyen kimse yok", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Yakın çevrenin ritmi şimdilik yolunda.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+            item {
+                ReminderSectionHeader(
+                    title = "Bugün",
+                    count = dashboard.today.size,
+                    emptyText = "Bugün net bekleyen kimse yok."
+                )
             }
-
-            items(upcomingContacts) { contact ->
+            items(dashboard.today) { contact ->
                 ContactReminderCard(
                     contact = contact,
-                    onLogInteraction = { type ->
-                        viewModel.logInteraction(contact.person.id, type)
-                    },
-                    onSnooze = {
-                        viewModel.snoozePersonForDays(contact.person.id, 1)
-                    }
+                    onLogInteraction = { type, note -> viewModel.logInteraction(contact.person.id, type, note) },
+                    onSnooze = { viewModel.snoozePersonForDays(contact.person.id, 1) }
                 )
+            }
+
+            item {
+                ReminderSectionHeader(
+                    title = "Gecikenler",
+                    count = dashboard.overdue.size,
+                    emptyText = "Gecikmiş ritim yok."
+                )
+            }
+            items(dashboard.overdue) { contact ->
+                ContactReminderCard(
+                    contact = contact,
+                    onLogInteraction = { type, note -> viewModel.logInteraction(contact.person.id, type, note) },
+                    onSnooze = { viewModel.snoozePersonForDays(contact.person.id, 1) }
+                )
+            }
+
+            item {
+                ReminderSectionHeader(
+                    title = "Yakında",
+                    count = dashboard.upcoming.size,
+                    emptyText = "Önümüzdeki hafta yaklaşan ritim yok."
+                )
+            }
+            items(dashboard.upcoming) { contact ->
+                ContactReminderCard(
+                    contact = contact,
+                    onLogInteraction = { type, note -> viewModel.logInteraction(contact.person.id, type, note) },
+                    onSnooze = { viewModel.snoozePersonForDays(contact.person.id, 1) }
+                )
+            }
+
+            item {
+                ReminderSectionHeader(
+                    title = "Ertelenenler",
+                    count = dashboard.snoozed.size,
+                    emptyText = "Ertelenmiş hatırlatma yok."
+                )
+            }
+            items(dashboard.snoozed) { contact ->
+                ContactReminderCard(
+                    contact = contact,
+                    onLogInteraction = { type, note -> viewModel.logInteraction(contact.person.id, type, note) },
+                    onSnooze = { viewModel.snoozePersonForDays(contact.person.id, 1) }
+                )
+            }
+
+            if (dueCount == 0 && dashboard.upcoming.isEmpty() && dashboard.snoozed.isEmpty()) {
+                item {
+                    EmptyReminderState()
+                }
             }
         }
     }
@@ -200,34 +193,108 @@ fun StatCard(label: String, value: String, icon: ImageVector, containerColor: an
 }
 
 @Composable
-fun ContactReminderCard(
-    contact: PersonWithWave,
-    onLogInteraction: (String) -> Unit,
-    onSnooze: () -> Unit
+private fun RhythmSummaryCard(
+    interactions: Int,
+    recentInteractions: Int,
+    syncMessage: String?,
+    isSyncing: Boolean,
+    onSync: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text("Hal hatır ritmi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("Toplam temas", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+                    Text("$interactions", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Son 7 gün", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+                    Text("$recentInteractions", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    syncMessage ?: "Arama kayıtları uygulama açıldığında kontrol edilir.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(enabled = !isSyncing, onClick = onSync) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Aramaları eşle")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (isSyncing) "Kontrol" else "Eşle")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReminderSectionHeader(title: String, count: Int, emptyText: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            AssistChip(onClick = {}, label = { Text("$count") }, enabled = false)
+        }
+        if (count == 0) {
+            Text(emptyText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun EmptyReminderState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Ritimler yolunda", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("Yakın çevren için şimdilik bekleyen aksiyon yok.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun ContactReminderCard(
+    contact: PersonWithWave,
+    onLogInteraction: (String, String) -> Unit,
+    onSnooze: () -> Unit
+) {
+    var showNoteDialog by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(contact.person.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("Döngü: ${contact.wave?.name ?: "Yok"} (${contact.wave?.frequencyDays ?: 0} gün)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "Döngü: ${contact.wave?.name ?: "Yok"} (${contact.effectiveFrequencyDays} gün) · ${contact.contactType.label}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer
-                ) {
-                    val status = if (contact.daysOverdue > 0) {
-                        "${contact.daysOverdue} gün geçti"
-                    } else {
-                        "Bugün"
-                    }
-                    Text(status, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Bold)
-                }
+                ReminderStatusBadge(contact)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -237,34 +304,114 @@ fun ContactReminderCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (contact.person.nextConversationHint.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Bir dahaki sefere: ${contact.person.nextConversationHint}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
-                    onClick = { onLogInteraction("CALL") },
-                    modifier = Modifier.weight(1f).height(56.dp),
+                    onClick = { onLogInteraction(contact.contactType.key, "") },
+                    modifier = Modifier.weight(1f).height(52.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Call, contentDescription = "Aradım")
+                    Icon(Icons.Default.Call, contentDescription = contact.contactType.label)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Aradım")
+                    Text("Temas ettim")
                 }
                 FilledTonalButton(
-                    onClick = { onLogInteraction("MEETING") },
-                    modifier = Modifier.weight(1f).height(56.dp),
+                    onClick = { showNoteDialog = true },
+                    modifier = Modifier.weight(1f).height(52.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Handshake, contentDescription = "Görüştüm")
+                    Icon(Icons.Default.EditNote, contentDescription = "Notla kaydet")
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Görüştüm")
+                    Text("Notla")
                 }
             }
             TextButton(
                 onClick = onSnooze,
                 modifier = Modifier.align(Alignment.End)
             ) {
+                Icon(Icons.Default.Schedule, contentDescription = "Yarın hatırlat")
+                Spacer(modifier = Modifier.width(6.dp))
                 Text("Yarın hatırlat")
             }
         }
     }
+
+    if (showNoteDialog) {
+        LogWithNoteDialog(
+            contactTypeLabel = contact.contactType.label,
+            onDismiss = { showNoteDialog = false },
+            onSave = { note ->
+                onLogInteraction(contact.contactType.key, note)
+                showNoteDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun ReminderStatusBadge(contact: PersonWithWave) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (contact.daysOverdue > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+    ) {
+        val status = when {
+            contact.snoozedUntilDate != null -> {
+                val dateStr = SimpleDateFormat("d MMM", Locale("tr", "TR")).format(Date(contact.snoozedUntilDate))
+                "$dateStr"
+            }
+            contact.daysOverdue > 0 -> "${contact.daysOverdue} gün geçti"
+            contact.daysOverdue == 0L && contact.isDue -> "Bugün"
+            contact.daysOverdue < 0 -> "${-contact.daysOverdue} gün kaldı"
+            else -> "Takipte"
+        }
+        Text(
+            status,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            color = if (contact.daysOverdue > 0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun LogWithNoteDialog(
+    contactTypeLabel: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var note by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("$contactTypeLabel notu") },
+        text = {
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Kısa not") },
+                placeholder = { Text("Ne konuştunuz?") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onSave(note) }) {
+                Text("Kaydet")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Vazgeç")
+            }
+        }
+    )
 }

@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import java.text.SimpleDateFormat
+import androidx.compose.foundation.text.KeyboardOptions
 import java.util.Date
 import java.util.Locale
 
@@ -29,16 +31,29 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     val people by viewModel.people.collectAsState()
     val person = people.find { it.id == personId }
     val interactions by viewModel.interactions.collectAsState()
+    val contactTypes by viewModel.contactTypes.collectAsState()
+    val activeContactTypes by viewModel.activeContactTypes.collectAsState()
     val personInteractions = interactions.filter { it.personId == personId }.sortedByDescending { it.timestamp }
 
     var editNotes by remember { mutableStateOf(person?.notes ?: "") }
     var editTags by remember { mutableStateOf(person?.tags ?: "") }
+    var editCustomFrequency by remember { mutableStateOf(person?.customFrequencyDays?.toString().orEmpty()) }
+    var editMemoryNotes by remember { mutableStateOf(person?.memoryNotes ?: "") }
+    var editNextHint by remember { mutableStateOf(person?.nextConversationHint ?: "") }
+    var editImportantLabel by remember { mutableStateOf(person?.importantDateLabel ?: "") }
+    var editImportantDate by remember { mutableStateOf(person?.importantDateMillis?.let { dateInputFormat().format(Date(it)) }.orEmpty()) }
+    var typeExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     LaunchedEffect(person) {
         if (person != null) {
             editNotes = person.notes
             editTags = person.tags
+            editCustomFrequency = person.customFrequencyDays?.toString().orEmpty()
+            editMemoryNotes = person.memoryNotes
+            editNextHint = person.nextConversationHint
+            editImportantLabel = person.importantDateLabel
+            editImportantDate = person.importantDateMillis?.let { dateInputFormat().format(Date(it)) }.orEmpty()
         }
     }
 
@@ -98,7 +113,7 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
             item {
                 Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Hatırlatma ve notlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Hatırlatma ritmi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -119,6 +134,46 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                                 }
                             )
                         }
+                        ExposedDropdownMenuBox(
+                            expanded = typeExpanded,
+                            onExpandedChange = { typeExpanded = !typeExpanded }
+                        ) {
+                            val currentType = contactTypes.find { it.key == person.preferredContactTypeKey }
+                                ?: activeContactTypes.firstOrNull()
+                            OutlinedTextField(
+                                value = currentType?.label ?: "Arama",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Tercih edilen temas") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = typeExpanded,
+                                onDismissRequest = { typeExpanded = false }
+                            ) {
+                                activeContactTypes.forEach { type ->
+                                    DropdownMenuItem(
+                                        text = { Text(type.label) },
+                                        onClick = {
+                                            viewModel.updatePerson(person.copy(preferredContactTypeKey = type.key))
+                                            typeExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = editCustomFrequency,
+                            onValueChange = {
+                                editCustomFrequency = it.filter { char -> char.isDigit() }
+                                viewModel.updatePerson(person.copy(customFrequencyDays = editCustomFrequency.toIntOrNull()?.takeIf { days -> days > 0 }))
+                            },
+                            label = { Text("Kişiye özel ritim") },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Boşsa döngü gün sayısı kullanılır") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
                         person.lastCallLogSyncDate?.let { syncDate ->
                             val syncDateStr = SimpleDateFormat("d MMM yyyy HH:mm", Locale("tr", "TR")).format(Date(syncDate))
                             Text(
@@ -137,6 +192,24 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Aile, okul, iş") }
                         )
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Son temas hafızası", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        OutlinedTextField(
+                            value = editNextHint,
+                            onValueChange = {
+                                editNextHint = it
+                                viewModel.updatePerson(person.copy(nextConversationHint = it))
+                            },
+                            label = { Text("Bir dahaki sefere sor") },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Nasıl gidiyor, yeni iş nasıl?") }
+                        )
                         OutlinedTextField(
                             value = editNotes,
                             onValueChange = {
@@ -147,6 +220,42 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                             modifier = Modifier.fillMaxWidth().height(120.dp),
                             maxLines = 5
                         )
+                        OutlinedTextField(
+                            value = editMemoryNotes,
+                            onValueChange = {
+                                editMemoryNotes = it
+                                viewModel.updatePerson(person.copy(memoryNotes = it))
+                            },
+                            label = { Text("Hafıza notu") },
+                            modifier = Modifier.fillMaxWidth().height(120.dp),
+                            maxLines = 5,
+                            placeholder = { Text("Sevdiği şeyler, hatırlanacak küçük detaylar") }
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = editImportantLabel,
+                                onValueChange = {
+                                    editImportantLabel = it
+                                    viewModel.updatePerson(person.copy(importantDateLabel = it))
+                                },
+                                label = { Text("Önemli tarih") },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("Doğum günü") }
+                            )
+                            OutlinedTextField(
+                                value = editImportantDate,
+                                onValueChange = {
+                                    editImportantDate = it
+                                    val millis = parseDateInput(it)
+                                    if (it.isBlank() || millis != null) {
+                                        viewModel.updatePerson(person.copy(importantDateMillis = millis))
+                                    }
+                                },
+                                label = { Text("Tarih") },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("2026-06-15") }
+                            )
+                        }
                     }
                 }
             }
@@ -168,9 +277,14 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(interactionTypeLabel(log.type), fontWeight = FontWeight.Bold)
-                        Text(dateStr, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(interactionTypeLabel(log.type, contactTypes), fontWeight = FontWeight.Bold)
+                            Text(dateStr, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (log.note.isNotBlank()) {
+                            Text(log.note, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
@@ -178,10 +292,19 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     }
 }
 
-private fun interactionTypeLabel(type: String): String {
-    return when (type) {
+private fun interactionTypeLabel(type: String, contactTypes: List<com.barisdincer.circlekeep.data.ContactType>): String {
+    return contactTypes.find { it.key == type }?.label ?: when (type) {
         "CALL" -> "Arama"
-        "MEETING" -> "Görüşme"
+        "MESSAGE" -> "Mesaj"
+        "MEETING" -> "Buluşma"
         else -> type
     }
+}
+
+private fun dateInputFormat(): SimpleDateFormat {
+    return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
+}
+
+private fun parseDateInput(input: String): Long? {
+    return runCatching { dateInputFormat().parse(input)?.time }.getOrNull()
 }

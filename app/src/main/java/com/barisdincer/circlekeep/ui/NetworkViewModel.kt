@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.ContactReminderCalculator
+import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.NetworkRepository
 import com.barisdincer.circlekeep.data.NetworkBackupCodec
@@ -29,6 +31,12 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
     private val _backupState = MutableStateFlow(BackupUiState())
     val backupState: StateFlow<BackupUiState> = _backupState.asStateFlow()
 
+    val contactTypes: StateFlow<List<ContactType>> = repository.allContactTypes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val activeContactTypes: StateFlow<List<ContactType>> = repository.activeContactTypes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DefaultContactTypes.all)
+
     val waves: StateFlow<List<Wave>> = repository.allWaves
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -46,17 +54,92 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
             .sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val upcomingContacts: StateFlow<List<PersonWithWave>> = combine(repository.allPeople, repository.allWaves) { p, w ->
+    val upcomingContacts: StateFlow<List<PersonWithWave>> = combine(
+        repository.allPeople,
+        repository.allWaves,
+        repository.allContactTypes
+    ) { p, w, types ->
         ContactReminderCalculator.dueContacts(p, w).map { dueContact ->
             PersonWithWave(
                 person = dueContact.person,
                 wave = dueContact.wave,
+                contactType = contactTypeFor(dueContact.person, types),
+                effectiveFrequencyDays = dueContact.effectiveFrequencyDays,
                 isDue = true,
                 daysSinceLastInteraction = dueContact.daysSinceLastInteraction,
                 daysOverdue = dueContact.daysOverdue
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dashboardReminders: StateFlow<ReminderDashboardUiState> = combine(
+        repository.allPeople,
+        repository.allWaves,
+        repository.allContactTypes
+    ) { people, waves, types ->
+        val due = ContactReminderCalculator.dueContacts(people, waves).map { dueContact ->
+            PersonWithWave(
+                person = dueContact.person,
+                wave = dueContact.wave,
+                contactType = contactTypeFor(dueContact.person, types),
+                effectiveFrequencyDays = dueContact.effectiveFrequencyDays,
+                isDue = true,
+                daysSinceLastInteraction = dueContact.daysSinceLastInteraction,
+                daysOverdue = dueContact.daysOverdue
+            )
+        }
+        val upcoming = ContactReminderCalculator.upcomingContacts(people, waves).map { dueContact ->
+            PersonWithWave(
+                person = dueContact.person,
+                wave = dueContact.wave,
+                contactType = contactTypeFor(dueContact.person, types),
+                effectiveFrequencyDays = dueContact.effectiveFrequencyDays,
+                isDue = false,
+                daysSinceLastInteraction = dueContact.daysSinceLastInteraction,
+                daysOverdue = dueContact.daysOverdue
+            )
+        }
+        val snoozed = people.mapNotNull { person ->
+            val snoozedUntil = person.snoozedUntilDate ?: return@mapNotNull null
+            if (snoozedUntil <= System.currentTimeMillis()) return@mapNotNull null
+            val wave = waves.find { it.id == person.waveId } ?: return@mapNotNull null
+            PersonWithWave(
+                person = person,
+                wave = wave,
+                contactType = contactTypeFor(person, types),
+                effectiveFrequencyDays = person.customFrequencyDays?.takeIf { it > 0 } ?: wave.frequencyDays,
+                isDue = false,
+                daysSinceLastInteraction = 0,
+                daysOverdue = 0,
+                snoozedUntilDate = snoozedUntil
+            )
+        }.sortedBy { it.snoozedUntilDate }
+
+        ReminderDashboardUiState(
+            today = due.filter { it.daysOverdue == 0L },
+            overdue = due.filter { it.daysOverdue > 0L },
+            upcoming = upcoming,
+            snoozed = snoozed
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ReminderDashboardUiState())
+
+    fun addContactType(label: String) {
+        viewModelScope.launch {
+            repository.insertContactType(label)
+        }
+    }
+
+    fun renameContactType(key: String, label: String) {
+        viewModelScope.launch {
+            repository.renameContactType(key, label)
+        }
+    }
+
+    fun setContactTypeActive(key: String, isActive: Boolean) {
+        viewModelScope.launch {
+            repository.setContactTypeActive(key, isActive)
+        }
+    }
 
     fun addWave(name: String, frequencyDays: Int) {
         viewModelScope.launch {
@@ -89,9 +172,9 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
-    fun logInteraction(personId: Int, type: String) {
+    fun logInteraction(personId: Int, type: String, note: String = "") {
         viewModelScope.launch {
-            repository.logInteraction(personId, type)
+            repository.logInteraction(personId, type, note)
         }
     }
 
@@ -131,6 +214,7 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
             runCatching {
                 NetworkBackupCodec.encode(
                     waves = repository.getWaveSnapshot(),
+                    contactTypes = repository.getContactTypeSnapshot(),
                     people = repository.getPeopleSnapshot(),
                     logs = repository.getInteractionSnapshot()
                 )
@@ -148,6 +232,7 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
             runCatching {
                 val backup = NetworkBackupCodec.decode(json)
                 repository.replaceAllData(
+                    contactTypes = backup.contactTypes,
                     waves = backup.waves,
                     people = backup.people,
                     logs = backup.logs
@@ -164,12 +249,27 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
     }
 }
 
+private fun contactTypeFor(person: Person, types: List<ContactType>): ContactType {
+    return types.find { it.key == person.preferredContactTypeKey }
+        ?: DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL }
+}
+
 data class PersonWithWave(
     val person: Person,
     val wave: Wave?,
+    val contactType: ContactType = DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL },
+    val effectiveFrequencyDays: Int = wave?.frequencyDays ?: 0,
     val isDue: Boolean,
     val daysSinceLastInteraction: Long = 0,
-    val daysOverdue: Long = 0
+    val daysOverdue: Long = 0,
+    val snoozedUntilDate: Long? = null
+)
+
+data class ReminderDashboardUiState(
+    val today: List<PersonWithWave> = emptyList(),
+    val overdue: List<PersonWithWave> = emptyList(),
+    val upcoming: List<PersonWithWave> = emptyList(),
+    val snoozed: List<PersonWithWave> = emptyList()
 )
 
 data class SyncUiState(

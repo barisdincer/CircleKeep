@@ -4,12 +4,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object NetworkBackupCodec {
-    private const val VERSION = 1
+    private const val VERSION = 2
 
-    fun encode(waves: List<Wave>, people: List<Person>, logs: List<InteractionLog>): String {
+    fun encode(
+        contactTypes: List<ContactType>,
+        waves: List<Wave>,
+        people: List<Person>,
+        logs: List<InteractionLog>
+    ): String {
         return JSONObject()
             .put("version", VERSION)
             .put("exportedAt", System.currentTimeMillis())
+            .put("contactTypes", JSONArray(contactTypes.map { it.toJson() }))
             .put("waves", JSONArray(waves.map { it.toJson() }))
             .put("people", JSONArray(people.map { it.toJson() }))
             .put("interactionLogs", JSONArray(logs.map { it.toJson() }))
@@ -18,10 +24,21 @@ object NetworkBackupCodec {
 
     fun decode(json: String): NetworkBackup {
         val root = JSONObject(json)
+        val contactTypes = root.optJSONArray("contactTypes")?.mapObjects { it.toContactType() }
+            ?: DefaultContactTypes.all
         val waves = root.getJSONArray("waves").mapObjects { it.toWave() }
         val people = root.getJSONArray("people").mapObjects { it.toPerson() }
         val logs = root.getJSONArray("interactionLogs").mapObjects { it.toInteractionLog() }
-        return NetworkBackup(waves = waves, people = people, logs = logs)
+        return NetworkBackup(contactTypes = contactTypes, waves = waves, people = people, logs = logs)
+    }
+
+    private fun ContactType.toJson(): JSONObject {
+        return JSONObject()
+            .put("key", key)
+            .put("label", label)
+            .put("isDefault", isDefault)
+            .put("isActive", isActive)
+            .put("sortOrder", sortOrder)
     }
 
     private fun Wave.toJson(): JSONObject {
@@ -41,6 +58,12 @@ object NetworkBackupCodec {
             .putNullable("waveId", waveId)
             .put("notes", notes)
             .put("tags", tags)
+            .put("preferredContactTypeKey", preferredContactTypeKey)
+            .putNullable("customFrequencyDays", customFrequencyDays)
+            .put("memoryNotes", memoryNotes)
+            .put("nextConversationHint", nextConversationHint)
+            .put("importantDateLabel", importantDateLabel)
+            .putNullable("importantDateMillis", importantDateMillis)
             .put("reminderEnabled", reminderEnabled)
             .put("addedDate", addedDate)
             .put("lastInteractionDate", lastInteractionDate)
@@ -54,6 +77,17 @@ object NetworkBackupCodec {
             .put("personId", personId)
             .put("timestamp", timestamp)
             .put("type", type)
+            .put("note", note)
+    }
+
+    private fun JSONObject.toContactType(): ContactType {
+        return ContactType(
+            key = getString("key"),
+            label = getString("label"),
+            isDefault = optBoolean("isDefault", false),
+            isActive = optBoolean("isActive", true),
+            sortOrder = optInt("sortOrder", 0)
+        )
     }
 
     private fun JSONObject.toWave(): Wave {
@@ -76,6 +110,12 @@ object NetworkBackupCodec {
             waveId = optNullableInt("waveId"),
             notes = optString("notes"),
             tags = optString("tags"),
+            preferredContactTypeKey = optString("preferredContactTypeKey", DefaultContactTypes.CALL),
+            customFrequencyDays = optNullableInt("customFrequencyDays"),
+            memoryNotes = optString("memoryNotes"),
+            nextConversationHint = optString("nextConversationHint"),
+            importantDateLabel = optString("importantDateLabel"),
+            importantDateMillis = optNullableLong("importantDateMillis"),
             reminderEnabled = optBoolean("reminderEnabled", true),
             addedDate = optLong("addedDate", System.currentTimeMillis()),
             lastInteractionDate = optLong("lastInteractionDate", System.currentTimeMillis()),
@@ -89,7 +129,8 @@ object NetworkBackupCodec {
             id = getInt("id"),
             personId = getInt("personId"),
             timestamp = getLong("timestamp"),
-            type = getString("type")
+            type = getString("type"),
+            note = optString("note")
         )
     }
 
@@ -115,6 +156,7 @@ object NetworkBackupCodec {
 }
 
 data class NetworkBackup(
+    val contactTypes: List<ContactType>,
     val waves: List<Wave>,
     val people: List<Person>,
     val logs: List<InteractionLog>
