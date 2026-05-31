@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Network Manager"
+rootProject.name = "CircleKeep"
 
 include(":app")

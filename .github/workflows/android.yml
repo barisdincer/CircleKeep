@@ -1,8 +1,7 @@
-name: Build Android APK
+name: Build CircleKeep
 
 on:
   push:
-    branches: [ "master", "main" ]
   pull_request:
     branches: [ "master", "main" ]
   workflow_dispatch:
@@ -21,8 +20,17 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Install Android SDK packages
+      run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+
+    - name: Test
+      run: ./gradlew testDebugUnitTest
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug
@@ -30,5 +38,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Network-Manager-APK
+        name: CircleKeep-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
