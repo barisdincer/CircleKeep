@@ -28,6 +28,14 @@ CircleKeep'i "kisisel iliski ritmi" uygulamasi olarak buyutecegiz: kullanici glo
 - Default/custom/pasif contact type akislari test edilir.
 - Backup yeni alanlari export eder ve eski backup'lari guvenli defaultlarla okur.
 
+## KMP Compatibility Notes
+- Iliski ritmi, due/upcoming hesaplari, contact type davranisi ve backup semasi Android API'lerine baglanmadan tasarlanmali.
+- `ContactType.key` ve `InteractionLog.type` string kalir; bu Android ve gelecekteki Apple istemcileri arasinda stabil ortak sozlesme olur.
+- Zaman alanlari epoch millis `Long` olarak kalir; platform tarih tipleri shared modele sizdirilmaz.
+- Room entity'leri bugunku Android persistence adapter'i olarak kalabilir, ancak yeni domain kurallari gelecekte `shared` module'e tasinabilecek saf Kotlin sekilde yazilmali.
+- Contacts, call logs, notifications ve Compose UI platform katmanidir; ritim/memory kurallari bu katmanlara import etmemeli.
+- Yeni backup/serialization calismalari mumkunse KMP uyumlu bir yola, ornegin kotlinx.serialization tabanli DTO'lara, evrilebilecek sekilde yapilmali.
+
 ## Assumptions
 - Bulusma planlama veya takvim entegrasyonu bu fazda yok.
 - Kisi ayni anda tek gruba bagli kalir.

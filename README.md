@@ -2,6 +2,8 @@
 
 CircleKeep is a local-first Android app for remembering the people you care about. It helps you keep simple check-in rhythms for friends, family, colleagues, and wider circles without turning personal relationships into a sales pipeline.
 
+The project is Android-first today, but it is being shaped for a future Kotlin Multiplatform shared core so the same relationship rhythm logic can support Apple clients later.
+
 The app stores people in reminder cycles, surfaces who is due for a check-in, records recent interactions, and can optionally match device call-log entries to people you already track.
 
 ## Problem
@@ -58,13 +60,20 @@ CircleKeep is a Kotlin Android app built with:
 - Android contacts and call-log providers for optional device integrations.
 - JSON export/import for portable local backups.
 
-Core data lives in three Room entities:
+Core data currently lives in Room entities:
 
 - `Wave`: a reminder cycle such as "Yakınlar", "Arkadaşlar", or "Tanıdıklar".
-- `Person`: a tracked contact with phone, notes, tags, reminder state, and last interaction dates.
-- `InteractionLog`: a local record of calls or meetings.
+- `ContactType`: a user-visible interaction type such as call, message, or meeting.
+- `Person`: a tracked contact with phone, notes, tags, memory fields, reminder state, and last interaction dates.
+- `InteractionLog`: a local record of contact moments with type, timestamp, and optional note.
 
-Database migrations are explicit and non-destructive. Existing local data is migrated through the `1 -> 2 -> 3 -> 4` chain instead of being wiped.
+Database migrations are explicit and non-destructive. Existing local data is migrated through the `1 -> 2 -> 3 -> 4 -> 5` chain instead of being wiped.
+
+### KMP-Ready Direction
+
+CircleKeep should keep platform-specific code at the edges. Relationship rhythm rules, due/upcoming grouping, contact type behavior, backup DTOs, and import/export rules should remain portable Kotlin whenever practical. Android-only pieces such as Room, contacts, call-log access, notification actions, and Compose screens should act as platform adapters around that core.
+
+Future Apple support should preserve the same privacy model: local storage, no required account, no backend dependency, and explicit user-controlled import/export.
 
 ## Roadmap
 
@@ -75,6 +84,8 @@ Database migrations are explicit and non-destructive. Existing local data is mig
 - Add better import conflict handling.
 - Add accessibility and localization polish.
 - Add optional widgets or quick actions for "called", "met", and "snooze".
+- Extract portable models, reminder rules, and backup DTOs into a Kotlin Multiplatform shared module.
+- Add an Apple client after the shared core boundary is stable.
 
 ## Contributing
 
@@ -94,10 +105,12 @@ Before opening a pull request:
 
 - Keep data local by default.
 - Avoid adding network access unless the privacy model is discussed first.
+- Keep new business logic KMP-ready and free of Android framework dependencies when possible.
 - Add or update tests for database, import, backup, and reminder logic.
 - Explain any new permission in this README.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the maintainer checklist.
+Agent-specific architecture rules live in [AGENTS.md](AGENTS.md), and the KMP migration direction is tracked in [docs/plans/kmp-shared-architecture.md](docs/plans/kmp-shared-architecture.md).
 
 ## Security Policy
 
