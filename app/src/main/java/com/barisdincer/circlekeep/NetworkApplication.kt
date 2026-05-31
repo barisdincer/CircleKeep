@@ -26,6 +26,7 @@ class NetworkApplication : Application() {
         .build()
         repository = NetworkRepository(database.networkDao())
         applicationScope.launch {
+            repository.ensureDefaultContactTypes()
             repository.ensureDefaultWaves()
         }
     }

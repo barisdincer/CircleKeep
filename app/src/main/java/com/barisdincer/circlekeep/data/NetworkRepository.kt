@@ -4,9 +4,41 @@ import kotlinx.coroutines.flow.Flow
 
 class NetworkRepository(private val networkDao: NetworkDao) {
 
+    val allContactTypes: Flow<List<ContactType>> = networkDao.getAllContactTypes()
+    val activeContactTypes: Flow<List<ContactType>> = networkDao.getActiveContactTypes()
     val allWaves: Flow<List<Wave>> = networkDao.getAllWaves()
     val allPeople: Flow<List<Person>> = networkDao.getAllPeople()
     val recentInteractions: Flow<List<InteractionLog>> = networkDao.getRecentInteractions()
+
+    suspend fun ensureDefaultContactTypes() {
+        networkDao.insertContactTypesIfMissing(DefaultContactTypes.all)
+    }
+
+    suspend fun insertContactType(label: String) {
+        val trimmedLabel = label.trim()
+        if (trimmedLabel.isBlank()) return
+        val nextSortOrder = (networkDao.getContactTypeSnapshot().maxOfOrNull { it.sortOrder } ?: 2) + 1
+        networkDao.insertContactType(
+            ContactType(
+                key = "CUSTOM_${System.currentTimeMillis()}_$nextSortOrder",
+                label = trimmedLabel,
+                isDefault = false,
+                isActive = true,
+                sortOrder = nextSortOrder
+            )
+        )
+    }
+
+    suspend fun renameContactType(key: String, label: String) {
+        val trimmedLabel = label.trim()
+        if (key.isBlank() || trimmedLabel.isBlank()) return
+        networkDao.renameContactType(key, trimmedLabel)
+    }
+
+    suspend fun setContactTypeActive(key: String, isActive: Boolean) {
+        if (key.isBlank()) return
+        networkDao.setContactTypeActive(key, isActive)
+    }
 
     suspend fun insertWave(wave: Wave) {
         networkDao.insertWave(wave)
@@ -45,9 +77,19 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         networkDao.updatePersonWave(personId, waveId)
     }
 
-    suspend fun logInteraction(personId: Int, type: String, timestamp: Long = System.currentTimeMillis()) {
-        val log = InteractionLog(personId = personId, timestamp = timestamp, type = type)
+    suspend fun logInteraction(
+        personId: Int,
+        type: String,
+        note: String = "",
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        val log = InteractionLog(personId = personId, timestamp = timestamp, type = type, note = note.trim())
         networkDao.logInteractionAndUpdatePerson(log)
+    }
+
+    suspend fun logPreferredInteraction(personId: Int, note: String = "") {
+        val person = networkDao.getPersonById(personId) ?: return
+        logInteraction(personId, person.preferredContactTypeKey, note)
     }
 
     suspend fun snoozePerson(personId: Int, untilDate: Long) {
@@ -70,12 +112,22 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         return networkDao.getWaveSnapshot()
     }
 
+    suspend fun getContactTypeSnapshot(): List<ContactType> {
+        return networkDao.getContactTypeSnapshot()
+    }
+
     suspend fun getInteractionSnapshot(): List<InteractionLog> {
         return networkDao.getInteractionSnapshot()
     }
 
-    suspend fun replaceAllData(waves: List<Wave>, people: List<Person>, logs: List<InteractionLog>) {
+    suspend fun replaceAllData(
+        contactTypes: List<ContactType>,
+        waves: List<Wave>,
+        people: List<Person>,
+        logs: List<InteractionLog>
+    ) {
         networkDao.replaceAllData(
+            contactTypes = contactTypes.ifEmpty { DefaultContactTypes.all },
             waves = waves,
             people = people.map { it.withNormalizedPhone() },
             logs = logs

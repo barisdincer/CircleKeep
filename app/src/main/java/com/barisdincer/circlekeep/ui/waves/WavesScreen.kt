@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,13 +16,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WavesScreen(viewModel: NetworkViewModel) {
     val waves by viewModel.waves.collectAsState()
+    val contactTypes by viewModel.contactTypes.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var showAddTypeDialog by remember { mutableStateOf(false) }
+    var editingType by remember { mutableStateOf<ContactType?>(null) }
 
     Scaffold(
         topBar = {
@@ -84,6 +89,33 @@ fun WavesScreen(viewModel: NetworkViewModel) {
                     }
                 }
             }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("İletişim türleri", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("Kişilerin hızlı aksiyonlarında kullanılacak türleri düzenle.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    FilledTonalButton(onClick = { showAddTypeDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Tür ekle")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Tür")
+                    }
+                }
+            }
+
+            items(contactTypes) { type ->
+                ContactTypeCard(
+                    type = type,
+                    onEdit = { editingType = type },
+                    onActiveChange = { isActive -> viewModel.setContactTypeActive(type.key, isActive) }
+                )
+            }
         }
 
         if (showAddDialog) {
@@ -94,6 +126,57 @@ fun WavesScreen(viewModel: NetworkViewModel) {
                     showAddDialog = false
                 }
             )
+        }
+
+        if (showAddTypeDialog) {
+            AddContactTypeDialog(
+                onDismiss = { showAddTypeDialog = false },
+                onAdd = { label ->
+                    viewModel.addContactType(label)
+                    showAddTypeDialog = false
+                }
+            )
+        }
+
+        editingType?.let { type ->
+            RenameContactTypeDialog(
+                type = type,
+                onDismiss = { editingType = null },
+                onRename = { label ->
+                    viewModel.renameContactType(type.key, label)
+                    editingType = null
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun ContactTypeCard(type: ContactType, onEdit: () -> Unit, onActiveChange: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(type.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    if (type.isDefault) "Varsayılan tür" else "Özel tür",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Türü yeniden adlandır")
+            }
+            Switch(checked = type.isActive, onCheckedChange = onActiveChange)
         }
     }
 }
@@ -134,6 +217,71 @@ fun AddWaveDialog(onDismiss: () -> Unit, onAdd: (String, Int) -> Unit) {
                 }
             ) {
                 Text("Ekle")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Vazgeç")
+            }
+        }
+    )
+}
+
+@Composable
+fun AddContactTypeDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    var label by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("İletişim türü ekle", fontWeight = FontWeight.Bold) },
+        text = {
+            OutlinedTextField(
+                value = label,
+                onValueChange = { label = it },
+                label = { Text("Tür adı") },
+                placeholder = { Text("Kahve, yürüyüş, oyun") },
+                shape = RoundedCornerShape(8.dp)
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (label.isNotBlank()) onAdd(label)
+                }
+            ) {
+                Text("Ekle")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Vazgeç")
+            }
+        }
+    )
+}
+
+@Composable
+fun RenameContactTypeDialog(type: ContactType, onDismiss: () -> Unit, onRename: (String) -> Unit) {
+    var label by remember(type.key) { mutableStateOf(type.label) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Türü düzenle", fontWeight = FontWeight.Bold) },
+        text = {
+            OutlinedTextField(
+                value = label,
+                onValueChange = { label = it },
+                label = { Text("Tür adı") },
+                shape = RoundedCornerShape(8.dp)
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (label.isNotBlank()) onRename(label)
+                }
+            ) {
+                Text("Kaydet")
             }
         },
         dismissButton = {

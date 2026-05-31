@@ -14,6 +14,32 @@ data class Wave(
 )
 
 @Entity(
+    tableName = "contact_types",
+    indices = [Index(value = ["key"], unique = true)]
+)
+data class ContactType(
+    @PrimaryKey val key: String,
+    val label: String,
+    @ColumnInfo(defaultValue = "0")
+    val isDefault: Boolean = false,
+    @ColumnInfo(defaultValue = "1")
+    val isActive: Boolean = true,
+    val sortOrder: Int = 0
+)
+
+object DefaultContactTypes {
+    const val CALL = "CALL"
+    const val MESSAGE = "MESSAGE"
+    const val MEETING = "MEETING"
+
+    val all = listOf(
+        ContactType(key = CALL, label = "Arama", isDefault = true, sortOrder = 0),
+        ContactType(key = MESSAGE, label = "Mesaj", isDefault = true, sortOrder = 1),
+        ContactType(key = MEETING, label = "Buluşma", isDefault = true, sortOrder = 2)
+    )
+}
+
+@Entity(
     tableName = "people",
     foreignKeys = [
         ForeignKey(
@@ -39,6 +65,16 @@ data class Person(
     val waveId: Int?,
     val notes: String = "",
     val tags: String = "",
+    @ColumnInfo(defaultValue = "'CALL'")
+    val preferredContactTypeKey: String = DefaultContactTypes.CALL,
+    val customFrequencyDays: Int? = null,
+    @ColumnInfo(defaultValue = "''")
+    val memoryNotes: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val nextConversationHint: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val importantDateLabel: String = "",
+    val importantDateMillis: Long? = null,
     @ColumnInfo(defaultValue = "1")
     val reminderEnabled: Boolean = true,
     val addedDate: Long = System.currentTimeMillis(),
@@ -66,5 +102,7 @@ data class InteractionLog(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val personId: Int,
     val timestamp: Long = System.currentTimeMillis(),
-    val type: String // "MEETING", "CALL" etc.
+    val type: String,
+    @ColumnInfo(defaultValue = "''")
+    val note: String = ""
 )

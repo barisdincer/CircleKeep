@@ -22,7 +22,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as NetworkApplication
                 when (intent.action) {
                     ReminderActions.ACTION_LOG_CALL -> {
-                        app.repository.logInteraction(personId, "CALL")
+                        app.repository.logPreferredInteraction(personId)
                     }
                     ReminderActions.ACTION_SNOOZE_TOMORROW -> {
                         app.repository.snoozePerson(personId, tomorrowAtNine())

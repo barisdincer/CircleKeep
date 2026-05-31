@@ -71,7 +71,42 @@ object DatabaseMigrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS contact_types (
+                    `key` TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    isDefault INTEGER NOT NULL DEFAULT 0,
+                    isActive INTEGER NOT NULL DEFAULT 1,
+                    sortOrder INTEGER NOT NULL,
+                    PRIMARY KEY(`key`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_contact_types_key ON contact_types(`key`)")
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO contact_types(`key`, label, isDefault, isActive, sortOrder)
+                VALUES
+                    ('CALL', 'Arama', 1, 1, 0),
+                    ('MESSAGE', 'Mesaj', 1, 1, 1),
+                    ('MEETING', 'Buluşma', 1, 1, 2)
+                """.trimIndent()
+            )
+
+            ensureColumn(db, "people", "preferredContactTypeKey", "TEXT NOT NULL DEFAULT 'CALL'")
+            ensureColumn(db, "people", "customFrequencyDays", "INTEGER")
+            ensureColumn(db, "people", "memoryNotes", "TEXT NOT NULL DEFAULT ''")
+            ensureColumn(db, "people", "nextConversationHint", "TEXT NOT NULL DEFAULT ''")
+            ensureColumn(db, "people", "importantDateLabel", "TEXT NOT NULL DEFAULT ''")
+            ensureColumn(db, "people", "importantDateMillis", "INTEGER")
+            ensureColumn(db, "interaction_logs", "note", "TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
     private const val PHONE_DIGITS_SQL =
         "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phoneNumber, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')"
