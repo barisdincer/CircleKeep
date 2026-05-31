@@ -2,6 +2,7 @@ package com.barisdincer.circlekeep.ui.people
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.*
@@ -22,6 +24,10 @@ import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import java.text.SimpleDateFormat
 import androidx.compose.foundation.text.KeyboardOptions
+import com.barisdincer.circlekeep.data.ContactType
+import com.barisdincer.circlekeep.data.DefaultContactTypes
+import com.barisdincer.circlekeep.data.InteractionLog
+import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.util.Date
 import java.util.Locale
 
@@ -44,7 +50,8 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     var editMemoryNotes by remember { mutableStateOf(person?.memoryNotes ?: "") }
     var editNextHint by remember { mutableStateOf(person?.nextConversationHint ?: "") }
     var editImportantLabel by remember { mutableStateOf(person?.importantDateLabel ?: "") }
-    var editImportantDate by remember { mutableStateOf(person?.importantDateMillis?.let { dateInputFormat().format(Date(it)) }.orEmpty()) }
+    var editImportantDateMillis by remember { mutableStateOf(person?.importantDateMillis) }
+    var editingLog by remember { mutableStateOf<InteractionLog?>(null) }
     var typeExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -59,7 +66,7 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
             editMemoryNotes = person.memoryNotes
             editNextHint = person.nextConversationHint
             editImportantLabel = person.importantDateLabel
-            editImportantDate = person.importantDateMillis?.let { dateInputFormat().format(Date(it)) }.orEmpty()
+            editImportantDateMillis = person.importantDateMillis
         }
     }
 
@@ -126,9 +133,21 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
             }
 
             item {
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Hatırlatma ritmi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Hatırlatma ritmi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Bu kişinin hangi tür temasla ve kaç günde bir hatırlatılacağını ayarla.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -212,7 +231,7 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                                     )
                                 )
                             },
-                            modifier = Modifier.align(Alignment.End),
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("Ritmi kaydet")
@@ -222,9 +241,21 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
             }
 
             item {
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Son temas hafızası", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Son temas hafızası", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Bir sonraki konuşma için küçük ipuçları ve kalıcı notlar.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         OutlinedTextField(
                             value = editNextHint,
                             onValueChange = { editNextHint = it },
@@ -255,18 +286,17 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                                 modifier = Modifier.weight(1f),
                                 placeholder = { Text("Doğum günü") }
                             )
-                            OutlinedTextField(
-                                value = editImportantDate,
-                                onValueChange = { editImportantDate = it },
-                                label = { Text("Tarih") },
+                            DatePickerField(
+                                label = "Tarih",
+                                selectedMillis = editImportantDateMillis,
+                                onDateSelected = { editImportantDateMillis = it },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("2026-06-15") }
+                                placeholder = "Tarih seç",
+                                clearLabel = "Tarihi temizle",
+                                onClear = { editImportantDateMillis = null }
                             )
                         }
-                        val parsedImportantDate = parseDateInput(editImportantDate)
-                        val canSaveMemory = editImportantDate.isBlank() || parsedImportantDate != null
                         Button(
-                            enabled = canSaveMemory,
                             onClick = {
                                 viewModel.updatePerson(
                                     person.copy(
@@ -274,21 +304,14 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                                         notes = editNotes,
                                         memoryNotes = editMemoryNotes,
                                         importantDateLabel = editImportantLabel,
-                                        importantDateMillis = parsedImportantDate
+                                        importantDateMillis = editImportantDateMillis
                                     )
                                 )
                             },
-                            modifier = Modifier.align(Alignment.End),
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("Hafızayı kaydet")
-                        }
-                        if (!canSaveMemory) {
-                            Text(
-                                "Tarih biçimi 2026-06-15 gibi olmalı.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
                         }
                     }
                 }
@@ -311,34 +334,125 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
-                    Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(interactionTypeLabel(log.type, contactTypes), fontWeight = FontWeight.Bold)
-                            Text(dateStr, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(interactionTypeLabel(log.type, contactTypes), fontWeight = FontWeight.Bold)
+                                Text(dateStr, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (log.note.isNotBlank()) {
+                                Text(log.note, style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
-                        if (log.note.isNotBlank()) {
-                            Text(log.note, style = MaterialTheme.typography.bodyMedium)
+                        IconButton(onClick = { editingLog = log }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Temas kaydını düzenle")
                         }
                     }
                 }
             }
         }
+
+        editingLog?.let { log ->
+            EditPersonLogSheet(
+                log = log,
+                contactTypes = contactTypes,
+                onDismiss = { editingLog = null },
+                onSave = { updated ->
+                    viewModel.updateInteractionLog(updated)
+                    editingLog = null
+                }
+            )
+        }
     }
 }
 
-private fun interactionTypeLabel(type: String, contactTypes: List<com.barisdincer.circlekeep.data.ContactType>): String {
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditPersonLogSheet(
+    log: InteractionLog,
+    contactTypes: List<ContactType>,
+    onDismiss: () -> Unit,
+    onSave: (InteractionLog) -> Unit
+) {
+    val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
+    var selectedTypeKey by remember(log.id, typeOptions) { mutableStateOf(log.type) }
+    var timestamp by remember(log.id) { mutableStateOf(log.timestamp) }
+    var note by remember(log.id) { mutableStateOf(log.note) }
+    var typeExpanded by remember { mutableStateOf(false) }
+    val selectedType = typeOptions.find { it.key == selectedTypeKey }
+        ?: DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        Column(
+            modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Temas kaydını düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+
+            ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = !typeExpanded }) {
+                OutlinedTextField(
+                    value = selectedType.label,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("İletişim türü") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
+                    typeOptions.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.label) },
+                            onClick = {
+                                selectedTypeKey = type.key
+                                typeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            DatePickerField(
+                label = "Tarih",
+                selectedMillis = timestamp,
+                onDateSelected = { timestamp = it }
+            )
+
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Not") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) {
+                    Text("Vazgeç")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { onSave(log.copy(type = selectedTypeKey, timestamp = timestamp, note = note)) },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Kaydet")
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+    }
+}
+
+private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>): String {
     return contactTypes.find { it.key == type }?.label ?: when (type) {
-        "CALL" -> "Arama"
-        "MESSAGE" -> "Mesaj"
-        "MEETING" -> "Buluşma"
+        DefaultContactTypes.CALL -> "Arama"
+        DefaultContactTypes.MESSAGE -> "Mesaj"
+        DefaultContactTypes.MEETING -> "Buluşma"
         else -> type
     }
-}
-
-private fun dateInputFormat(): SimpleDateFormat {
-    return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
-}
-
-private fun parseDateInput(input: String): Long? {
-    return runCatching { dateInputFormat().parse(input)?.time }.getOrNull()
 }

@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -106,7 +105,10 @@ fun AppNavigation(
                 )
             }
             composable("logs") {
-                LogsScreen(viewModel)
+                LogsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable("reports") {
                 ReportsScreen(viewModel)
@@ -115,6 +117,7 @@ fun AppNavigation(
                 ProfileScreen(
                     preferences = userPreferences,
                     onBack = { navController.popBackStack() },
+                    onLogsClick = { navController.navigate("logs") },
                     onSaveProfile = preferencesStore::updateProfile,
                     onThemeModeChange = preferencesStore::updateThemeMode
                 )
@@ -161,8 +164,8 @@ private fun BottomNavigationBar(navController: NavHostController) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
+                .height(58.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -186,13 +189,6 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 icon = Icons.Default.Group,
                 modifier = Modifier.weight(1f),
                 onClick = { navController.navigateTopLevel("waves") }
-            )
-            CompactNavItem(
-                selected = currentDestination == "logs",
-                label = "Log",
-                icon = Icons.Default.History,
-                modifier = Modifier.weight(1f),
-                onClick = { navController.navigateTopLevel("logs") }
             )
             CompactNavItem(
                 selected = currentDestination == "reports",
@@ -225,14 +221,14 @@ private fun CompactNavItem(
 
     Column(
         modifier = modifier
-            .height(40.dp)
+            .height(50.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(background)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp), tint = contentColor)
+        Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = contentColor)
         Text(label, style = MaterialTheme.typography.labelSmall, color = contentColor)
     }
 }

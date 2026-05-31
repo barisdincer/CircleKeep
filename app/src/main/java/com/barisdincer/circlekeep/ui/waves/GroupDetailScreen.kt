@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -26,11 +27,11 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,17 +59,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.barisdincer.circlekeep.data.ContactDatePreset
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.groupMemberRhythm
-import com.barisdincer.circlekeep.data.resolveTimestamp
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.data.statusLabel
 import com.barisdincer.circlekeep.ui.NetworkViewModel
+import com.barisdincer.circlekeep.ui.components.DatePickerField
 import com.barisdincer.circlekeep.ui.people.AddPersonDialog
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -247,11 +247,11 @@ fun GroupDetailScreen(
 
         if (showGroupLogSheet) {
             GroupContactLogSheet(
+                groupPeople = groupPeople,
                 contactTypes = activeContactTypes,
-                enabled = groupPeople.isNotEmpty(),
                 onDismiss = { showGroupLogSheet = false },
-                onSave = { type, note, timestamp ->
-                    viewModel.logInteractions(groupPeople.map { it.id }, type, note, timestamp)
+                onSave = { personIds, type, note, timestamp ->
+                    viewModel.logInteractions(personIds, type, note, timestamp)
                     showGroupLogSheet = false
                 }
             )
@@ -284,7 +284,7 @@ private fun GroupActionsCard(
                 Button(onClick = onLogGroup, shape = RoundedCornerShape(8.dp)) {
                     Icon(Icons.Default.EditNote, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Grup teması")
+                    Text("Etkinlik ekle")
                 }
                 OutlinedButton(onClick = onNewPerson, shape = RoundedCornerShape(8.dp)) {
                     Icon(Icons.Default.Add, contentDescription = null)
@@ -421,14 +421,15 @@ private fun ExistingPersonSheet(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun GroupContactLogSheet(
+    groupPeople: List<Person>,
     contactTypes: List<ContactType>,
-    enabled: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String, Long) -> Unit
+    onSave: (List<Int>, String, String, Long) -> Unit
 ) {
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
     var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
-    var selectedDatePreset by remember { mutableStateOf(ContactDatePreset.TODAY) }
+    var selectedTimestamp by remember { mutableStateOf(System.currentTimeMillis()) }
+    var selectedPersonIds by remember(groupPeople) { mutableStateOf(groupPeople.map { it.id }.toSet()) }
     var note by remember { mutableStateOf("") }
     var typeExpanded by remember { mutableStateOf(false) }
     val selectedType = typeOptions.find { it.key == selectedTypeKey } ?: typeOptions.first()
@@ -438,9 +439,9 @@ private fun GroupContactLogSheet(
             modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Grup teması kaydet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Etkinlik ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "Seçilen tür tüm grup üyeleri için aynı zaman ve notla kaydedilir.",
+                "Bu gruptan katılan kişileri seç; tarih, tür ve not hepsine tek seferde kaydedilir.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -468,18 +469,45 @@ private fun GroupContactLogSheet(
                 }
             }
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                listOf(
-                    ContactDatePreset.TODAY,
-                    ContactDatePreset.YESTERDAY,
-                    ContactDatePreset.THREE_DAYS_AGO,
-                    ContactDatePreset.WEEK_AGO
-                ).forEach { preset ->
-                    FilterChip(
-                        selected = selectedDatePreset == preset,
-                        onClick = { selectedDatePreset = preset },
-                        label = { Text(preset.label) }
-                    )
+            DatePickerField(
+                label = "Tarih",
+                selectedMillis = selectedTimestamp,
+                onDateSelected = { selectedTimestamp = it }
+            )
+
+            Text("Katılımcılar", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 220.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                items(groupPeople, key = { it.id }) { person ->
+                    val checked = person.id in selectedPersonIds
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedPersonIds = if (checked) {
+                                    selectedPersonIds - person.id
+                                } else {
+                                    selectedPersonIds + person.id
+                                }
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = {
+                                selectedPersonIds = if (checked) {
+                                    selectedPersonIds - person.id
+                                } else {
+                                    selectedPersonIds + person.id
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(person.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
 
@@ -499,10 +527,9 @@ private fun GroupContactLogSheet(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    enabled = enabled,
+                    enabled = selectedPersonIds.isNotEmpty(),
                     onClick = {
-                        val timestamp = selectedDatePreset.resolveTimestamp() ?: System.currentTimeMillis()
-                        onSave(selectedType.key, note, timestamp)
+                        onSave(selectedPersonIds.toList(), selectedType.key, note, selectedTimestamp)
                     },
                     shape = RoundedCornerShape(8.dp)
                 ) {

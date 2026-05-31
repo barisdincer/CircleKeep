@@ -100,6 +100,18 @@ interface NetworkDao {
     @Query("UPDATE people SET lastInteractionDate = :date WHERE id = :personId")
     suspend fun updateLastInteraction(personId: Int, date: Long)
 
+    @Query(
+        """
+        UPDATE people
+        SET lastInteractionDate = COALESCE(
+            (SELECT MAX(timestamp) FROM interaction_logs WHERE personId = :personId),
+            addedDate
+        )
+        WHERE id = :personId
+        """
+    )
+    suspend fun refreshLastInteractionFromLogs(personId: Int)
+
     @Query("UPDATE people SET snoozedUntilDate = :date WHERE id = :personId")
     suspend fun updateSnoozedUntil(personId: Int, date: Long?)
 
@@ -169,14 +181,14 @@ interface NetworkDao {
     @Transaction
     suspend fun logInteractionAndUpdatePerson(log: InteractionLog) {
         insertInteractionLog(log)
-        updateLastInteraction(log.personId, log.timestamp)
+        refreshLastInteractionFromLogs(log.personId)
     }
 
     @Transaction
     suspend fun logInteractionsAndUpdatePeople(logs: List<InteractionLog>) {
         logs.forEach { log ->
             insertInteractionLog(log)
-            updateLastInteraction(log.personId, log.timestamp)
+            refreshLastInteractionFromLogs(log.personId)
         }
     }
 

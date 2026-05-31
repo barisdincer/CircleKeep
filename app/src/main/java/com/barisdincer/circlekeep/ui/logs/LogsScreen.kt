@@ -3,8 +3,6 @@ package com.barisdincer.circlekeep.ui.logs
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
@@ -28,7 +27,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,21 +54,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.barisdincer.circlekeep.data.ContactDatePreset
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
-import com.barisdincer.circlekeep.data.resolveTimestamp
 import com.barisdincer.circlekeep.ui.NetworkViewModel
+import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogsScreen(viewModel: NetworkViewModel) {
+fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
     val logs by viewModel.allInteractions.collectAsState()
     val people by viewModel.people.collectAsState()
     val waves by viewModel.waves.collectAsState()
@@ -92,7 +89,14 @@ fun LogsScreen(viewModel: NetworkViewModel) {
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Log", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge) },
+                    title = { Text("Temas logları", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge) },
+                    navigationIcon = {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -226,7 +230,7 @@ private fun LogCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditLogSheet(
     log: InteractionLog,
@@ -272,21 +276,11 @@ private fun EditLogSheet(
                 }
             }
 
-            Text("Tarih: ${formatLogDate(timestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                listOf(
-                    ContactDatePreset.TODAY,
-                    ContactDatePreset.YESTERDAY,
-                    ContactDatePreset.THREE_DAYS_AGO,
-                    ContactDatePreset.WEEK_AGO
-                ).forEach { preset ->
-                    FilterChip(
-                        selected = false,
-                        onClick = { timestamp = preset.resolveTimestamp() ?: timestamp },
-                        label = { Text(preset.label) }
-                    )
-                }
-            }
+            DatePickerField(
+                label = "Tarih",
+                selectedMillis = timestamp,
+                onDateSelected = { timestamp = it }
+            )
 
             OutlinedTextField(
                 value = note,

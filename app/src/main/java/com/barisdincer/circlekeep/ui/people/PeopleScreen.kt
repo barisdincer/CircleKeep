@@ -26,16 +26,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.barisdincer.circlekeep.data.ContactDatePreset
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
-import com.barisdincer.circlekeep.data.resolveTimestamp
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.device.PhonebookContact
 import com.barisdincer.circlekeep.device.PhonebookReader
 import com.barisdincer.circlekeep.ui.NetworkViewModel
+import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -414,7 +413,8 @@ fun AddPersonDialog(
     var selectedWaveId by remember(initialWaveId) { mutableStateOf(initialWaveId) }
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
     var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
-    var initialDatePreset by remember { mutableStateOf(ContactDatePreset.TODAY) }
+    var hasInitialContact by remember { mutableStateOf(true) }
+    var initialContactDate by remember { mutableStateOf(System.currentTimeMillis()) }
     var initialNote by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     var typeExpanded by remember { mutableStateOf(false) }
@@ -567,23 +567,25 @@ fun AddPersonDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Son temas", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(
-                        ContactDatePreset.TODAY,
-                        ContactDatePreset.YESTERDAY,
-                        ContactDatePreset.THREE_DAYS_AGO,
-                        ContactDatePreset.WEEK_AGO,
-                        ContactDatePreset.NONE
-                    ).forEach { preset ->
-                        FilterChip(
-                            selected = initialDatePreset == preset,
-                            onClick = { initialDatePreset = preset },
-                            label = { Text(if (preset == ContactDatePreset.TODAY) "Bugünden başlat" else preset.label) }
-                        )
-                    }
+                    FilterChip(
+                        selected = hasInitialContact,
+                        onClick = { hasInitialContact = true },
+                        label = { Text("Tarihten başlat") }
+                    )
+                    FilterChip(
+                        selected = !hasInitialContact,
+                        onClick = { hasInitialContact = false },
+                        label = { Text("Henüz temas yok") }
+                    )
                 }
             }
 
-            if (initialDatePreset != ContactDatePreset.NONE) {
+            if (hasInitialContact) {
+                DatePickerField(
+                    label = "Son temas tarihi",
+                    selectedMillis = initialContactDate,
+                    onDateSelected = { initialContactDate = it }
+                )
                 OutlinedTextField(
                     value = initialNote,
                     onValueChange = { initialNote = it },
@@ -607,14 +609,13 @@ fun AddPersonDialog(
                 Button(
                 onClick = {
                     if (name.isNotBlank()) {
-                            val timestamp = initialDatePreset.resolveTimestamp()
                             onAdd(
                                 name,
                                 phone,
                                 selectedWaveId,
                                 contactLookupKey,
-                                if (timestamp == null) null else selectedTypeKey,
-                                timestamp,
+                                selectedTypeKey,
+                                if (hasInitialContact) initialContactDate else null,
                                 initialNote
                             )
                     }

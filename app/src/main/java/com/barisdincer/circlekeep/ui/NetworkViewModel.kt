@@ -210,7 +210,8 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
                     name = trimmedName,
                     phoneNumber = phoneNumber,
                     contactLookupKey = contactLookupKey,
-                    waveId = waveId
+                    waveId = waveId,
+                    preferredContactTypeKey = initialInteractionType ?: DefaultContactTypes.CALL
                 ),
                 initialInteractionType = initialInteractionType,
                 initialInteractionTimestamp = initialInteractionTimestamp,

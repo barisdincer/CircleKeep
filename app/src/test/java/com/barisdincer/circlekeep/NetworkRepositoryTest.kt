@@ -162,6 +162,16 @@ class NetworkRepositoryTest {
     }
 
     @Test
+    fun `backdated interaction does not replace newer last interaction`() = runBlocking {
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 300L)
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.MEETING, timestamp = 100L)
+
+        assertEquals(300L, repository.getPeopleSnapshot().single().lastInteractionDate)
+        assertEquals(listOf(300L, 100L), repository.getInteractionSnapshot().map { it.timestamp })
+    }
+
+    @Test
     fun `updating latest log refreshes person last interaction`() = runBlocking {
         repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
         repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 100L)

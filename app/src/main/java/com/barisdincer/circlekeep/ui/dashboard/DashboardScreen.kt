@@ -41,7 +41,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -72,16 +71,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.barisdincer.circlekeep.data.ContactDatePreset
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.contactActionLabel
-import com.barisdincer.circlekeep.data.resolveTimestamp
+import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.PersonWithWave
+import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -349,7 +348,7 @@ private fun RhythmSummaryCard(
             ) {
                 Icon(Icons.Default.EditNote, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Grup veya çoklu temas kaydet")
+                Text("Etkinlik ekle")
             }
         }
     }
@@ -520,7 +519,7 @@ private fun ContactLogSheet(
 
     var selectedPersonIds by remember(sheet) { mutableStateOf(initialPersonIds) }
     var selectedTypeKey by remember(sheet, contactTypes) { mutableStateOf(initialTypeKey) }
-    var selectedDatePreset by remember(sheet) { mutableStateOf(ContactDatePreset.TODAY) }
+    var selectedTimestamp by remember(sheet) { mutableStateOf(System.currentTimeMillis()) }
     var note by remember(sheet) { mutableStateOf("") }
     var typeExpanded by remember { mutableStateOf(false) }
     var groupExpanded by remember { mutableStateOf(false) }
@@ -541,7 +540,7 @@ private fun ContactLogSheet(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    if (editableParticipants) "Temas kaydet" else "${selectedPeople.firstOrNull()?.name ?: "Kişi"} ile temas",
+                    if (editableParticipants) "Etkinlik ekle" else "${selectedPeople.firstOrNull()?.name ?: "Kişi"} ile temas",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -589,20 +588,11 @@ private fun ContactLogSheet(
                 }
             }
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf(
-                    ContactDatePreset.TODAY,
-                    ContactDatePreset.YESTERDAY,
-                    ContactDatePreset.THREE_DAYS_AGO,
-                    ContactDatePreset.WEEK_AGO
-                ).forEach { preset ->
-                    FilterChip(
-                        selected = selectedDatePreset == preset,
-                        onClick = { selectedDatePreset = preset },
-                        label = { Text(preset.label) }
-                    )
-                }
-            }
+            DatePickerField(
+                label = "Tarih",
+                selectedMillis = selectedTimestamp,
+                onDateSelected = { selectedTimestamp = it }
+            )
 
             if (editableParticipants) {
                 ExposedDropdownMenuBox(
@@ -648,7 +638,7 @@ private fun ContactLogSheet(
                     modifier = Modifier.heightIn(max = 260.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(people, key = { it.id }) { person ->
+                    items(people.sortedByTurkish { it.name }, key = { it.id }) { person ->
                         val checked = person.id in selectedPersonIds
                         Row(
                             modifier = Modifier
@@ -723,12 +713,11 @@ private fun ContactLogSheet(
                 Button(
                     enabled = selectedPersonIds.isNotEmpty(),
                     onClick = {
-                        val timestamp = selectedDatePreset.resolveTimestamp() ?: System.currentTimeMillis()
-                        onSave(selectedPersonIds.toList(), selectedType.key, note, timestamp)
+                        onSave(selectedPersonIds.toList(), selectedType.key, note, selectedTimestamp)
                     },
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("${contactActionLabel(selectedType.key, selectedType.label)} kaydet")
+                    Text(contactActionLabel(selectedType.key, selectedType.label))
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
