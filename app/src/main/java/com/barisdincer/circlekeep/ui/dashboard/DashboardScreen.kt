@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
@@ -44,6 +46,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -102,6 +105,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var logSheet by remember { mutableStateOf<ContactLogSheetState?>(null) }
+    var showUpcoming by remember { mutableStateOf(false) }
     val dueCount = dashboard.today.size + dashboard.overdue.size
 
     LaunchedEffect(uiMessage) {
@@ -210,15 +214,19 @@ fun DashboardScreen(
                 ReminderSectionHeader(
                     title = "Sıradakiler",
                     count = dashboard.upcoming.size,
-                    emptyText = "Sırada bekleyen ritim yok."
+                    emptyText = "Sırada bekleyen ritim yok.",
+                    expanded = showUpcoming,
+                    onToggle = { showUpcoming = !showUpcoming }
                 )
             }
-            items(dashboard.upcoming) { contact ->
-                ContactReminderCard(
-                    contact = contact,
-                    onOpenLogSheet = { logSheet = ContactLogSheetState.Single(contact) },
-                    onSnooze = { viewModel.snoozePersonForDays(contact.person.id, 1) }
-                )
+            if (showUpcoming) {
+                items(dashboard.upcoming) { contact ->
+                    ContactReminderCard(
+                        contact = contact,
+                        onOpenLogSheet = { logSheet = ContactLogSheetState.Single(contact) },
+                        onSnooze = { viewModel.snoozePersonForDays(contact.person.id, 1) }
+                    )
+                }
             }
 
             item {
@@ -355,14 +363,51 @@ private fun RhythmSummaryCard(
 }
 
 @Composable
-private fun ReminderSectionHeader(title: String, count: Int, emptyText: String) {
+private fun ReminderSectionHeader(
+    title: String,
+    count: Int,
+    emptyText: String,
+    expanded: Boolean? = null,
+    onToggle: (() -> Unit)? = null
+) {
+    val toggleAction = onToggle
+    val isToggleable = expanded != null && toggleAction != null
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            AssistChip(onClick = {}, label = { Text("$count") }, enabled = false)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (isToggleable) {
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { toggleAction?.invoke() }
+                    } else {
+                        Modifier
+                    }
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                AssistChip(onClick = {}, label = { Text("$count") }, enabled = false)
+            }
+            if (isToggleable) {
+                IconButton(onClick = { toggleAction?.invoke() }) {
+                    Icon(
+                        if (expanded == true) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded == true) "Kapat" else "Aç"
+                    )
+                }
+            }
         }
-        if (count == 0) {
-            Text(emptyText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        when {
+            count == 0 -> Text(emptyText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            isToggleable && expanded == false -> Text(
+                "En yakın ritimleri görmek için aç.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -400,8 +445,9 @@ fun ContactReminderCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(contact.person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val rhythmScope = contact.wave?.name ?: "Kişiye özel ritim"
                     Text(
-                        "Grup: ${contact.wave?.name ?: "Yok"} (${contact.effectiveFrequencyDays} gün) · ${contact.actionTimingLabel()}",
+                        "Ritim: $rhythmScope (${contact.effectiveFrequencyDays} gün) · ${contact.actionTimingLabel()}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
