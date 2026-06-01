@@ -9,21 +9,71 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Contacts
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.barisdincer.circlekeep.data.ContactType
@@ -41,14 +91,16 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
+fun PeopleScreen(
+    viewModel: NetworkViewModel,
+    onPersonClick: (Int) -> Unit,
+    onAddPersonClick: () -> Unit
+) {
     val people by viewModel.people.collectAsState()
     val waves by viewModel.waves.collectAsState()
-    val activeContactTypes by viewModel.activeContactTypes.collectAsState()
     val uniqueTags by viewModel.uniqueTags.collectAsState()
     val uiMessage by viewModel.uiMessage.collectAsState()
     var selectedTag by remember { mutableStateOf<String?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
     var showBulkImportDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -107,7 +159,7 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = onAddPersonClick,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
@@ -205,27 +257,6 @@ fun PeopleScreen(viewModel: NetworkViewModel, onPersonClick: (Int) -> Unit) {
                     }
                 }
             }
-        }
-
-        if (showAddDialog) {
-            AddPersonDialog(
-                waves = waves,
-                contactTypes = activeContactTypes,
-                initialWaveId = null,
-                onDismiss = { showAddDialog = false },
-                onAdd = { name, phone, waveId, contactLookupKey, initialType, initialTimestamp, initialNote ->
-                    viewModel.addPerson(
-                        name = name,
-                        phoneNumber = phone,
-                        waveId = waveId,
-                        contactLookupKey = contactLookupKey,
-                        initialInteractionType = initialType,
-                        initialInteractionTimestamp = initialTimestamp,
-                        initialInteractionNote = initialNote
-                    )
-                    showAddDialog = false
-                }
-            )
         }
 
         if (showBulkImportDialog) {
@@ -400,12 +431,12 @@ fun BulkImportContactsDialog(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddPersonDialog(
+fun AddPersonScreen(
     waves: List<Wave>,
     contactTypes: List<ContactType>,
     initialWaveId: Int? = null,
-    onDismiss: () -> Unit,
-    onAdd: (String, String, Int?, String?, String?, Long?, String) -> Unit
+    onBack: () -> Unit,
+    onAdd: (String, String, Int?, String?, String?, Long?, String, Int?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -413,6 +444,7 @@ fun AddPersonDialog(
     var selectedWaveId by remember(initialWaveId) { mutableStateOf(initialWaveId) }
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
     var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
+    var customFrequency by remember { mutableStateOf("") }
     var hasInitialContact by remember { mutableStateOf(true) }
     var initialContactDate by remember { mutableStateOf(System.currentTimeMillis()) }
     var initialNote by remember { mutableStateOf("") }
@@ -435,180 +467,227 @@ fun AddPersonDialog(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text("Kişi ekle", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            }
+        }
+    ) { padding ->
+        LazyColumn(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(padding)
                 .imePadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Kişi ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            item {
                 Text(
-                    "Son ne zaman temas ettiğini seçersen ritim bugünden doğru hesaplanır.",
+                    "Klavye kapansa bile bu sayfa açık kalır. Kişinin ritmini ve ilk temasını kaydedip net bir başlangıç yapabilirsin.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
+            item {
                 Button(
                     onClick = {
                         when (PackageManager.PERMISSION_GRANTED) {
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) -> {
-                                contactPicker.launch(null)
-                            }
-                            else -> {
-                                requestPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-                            }
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) -> contactPicker.launch(null)
+                            else -> requestPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 ) {
                     Icon(Icons.Default.Contacts, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Rehberden seç", fontWeight = FontWeight.Bold)
                 }
+            }
 
-            HorizontalDivider()
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("İsim") },
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Telefon") },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    val selectedWaveName = waves.find { it.id == selectedWaveId }?.name ?: "Grup seç"
-                    OutlinedTextField(
-                        value = selectedWaveName,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Grup") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                        modifier = Modifier
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                            .fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Grup yok") },
-                            onClick = {
-                                selectedWaveId = null
-                                expanded = false
-                            }
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("İsim") },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
                         )
-                        waves.forEach { wave ->
-                            DropdownMenuItem(
-                                text = { Text(wave.name) },
-                                onClick = {
-                                    selectedWaveId = wave.id
-                                    expanded = false
+                        OutlinedTextField(
+                            value = phone,
+                            onValueChange = { phone = it },
+                            label = { Text("Telefon") },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Ritim", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        ExposedDropdownMenuBox(
+                            expanded = expanded,
+                            onExpandedChange = { expanded = !expanded }
+                        ) {
+                            val selectedWaveName = waves.find { it.id == selectedWaveId }?.name ?: "Grup yok"
+                            OutlinedTextField(
+                                value = selectedWaveName,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Grup") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                                    .fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Grup yok") },
+                                    onClick = {
+                                        selectedWaveId = null
+                                        expanded = false
+                                    }
+                                )
+                                waves.forEach { wave ->
+                                    DropdownMenuItem(
+                                        text = { Text("${wave.name} (${wave.frequencyDays} gün)") },
+                                        onClick = {
+                                            selectedWaveId = wave.id
+                                            expanded = false
+                                        }
+                                    )
                                 }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = customFrequency,
+                            onValueChange = { customFrequency = it.filter { char -> char.isDigit() } },
+                            label = { Text("Kişiye özel ritim") },
+                            placeholder = { Text("Örn. 90; boşsa grup ritmi") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("İletişim", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        ExposedDropdownMenuBox(
+                            expanded = typeExpanded,
+                            onExpandedChange = { typeExpanded = !typeExpanded }
+                        ) {
+                            val selectedType = typeOptions.find { it.key == selectedTypeKey } ?: typeOptions.first()
+                            OutlinedTextField(
+                                value = selectedType.label,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Varsayılan iletişim türü") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                                    .fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = typeExpanded,
+                                onDismissRequest = { typeExpanded = false }
+                            ) {
+                                typeOptions.forEach { type ->
+                                    DropdownMenuItem(
+                                        text = { Text(type.label) },
+                                        onClick = {
+                                            selectedTypeKey = type.key
+                                            typeExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            FilterChip(
+                                selected = hasInitialContact,
+                                onClick = { hasInitialContact = true },
+                                label = { Text("Son temas var") }
+                            )
+                            FilterChip(
+                                selected = !hasInitialContact,
+                                onClick = { hasInitialContact = false },
+                                label = { Text("Bugünden takip et") }
+                            )
+                        }
+                        if (hasInitialContact) {
+                            DatePickerField(
+                                label = "Son temas tarihi",
+                                selectedMillis = initialContactDate,
+                                onDateSelected = { initialContactDate = it }
+                            )
+                            OutlinedTextField(
+                                value = initialNote,
+                                onValueChange = { initialNote = it },
+                                label = { Text("İlk temas notu") },
+                                placeholder = { Text("İsteğe bağlı") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                shape = RoundedCornerShape(8.dp)
                             )
                         }
                     }
                 }
-
-            ExposedDropdownMenuBox(
-                expanded = typeExpanded,
-                onExpandedChange = { typeExpanded = !typeExpanded }
-            ) {
-                val selectedType = typeOptions.find { it.key == selectedTypeKey } ?: typeOptions.first()
-                OutlinedTextField(
-                    value = selectedType.label,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Varsayılan iletişim türü") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                        .fillMaxWidth()
-                )
-                ExposedDropdownMenu(
-                    expanded = typeExpanded,
-                    onDismissRequest = { typeExpanded = false }
-                ) {
-                    typeOptions.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.label) },
-                            onClick = {
-                                selectedTypeKey = type.key
-                                typeExpanded = false
-                            }
-                        )
-                    }
-                }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Son temas", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilterChip(
-                        selected = hasInitialContact,
-                        onClick = { hasInitialContact = true },
-                        label = { Text("Tarihten başlat") }
-                    )
-                    FilterChip(
-                        selected = !hasInitialContact,
-                        onClick = { hasInitialContact = false },
-                        label = { Text("Henüz temas yok") }
-                    )
-                }
-            }
-
-            if (hasInitialContact) {
-                DatePickerField(
-                    label = "Son temas tarihi",
-                    selectedMillis = initialContactDate,
-                    onDateSelected = { initialContactDate = it }
-                )
-                OutlinedTextField(
-                    value = initialNote,
-                    onValueChange = { initialNote = it },
-                    label = { Text("İlk temas notu") },
-                    placeholder = { Text("İsteğe bağlı") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                    shape = RoundedCornerShape(8.dp)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Vazgeç")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
+            item {
                 Button(
-                onClick = {
-                    if (name.isNotBlank()) {
+                    onClick = {
+                        if (name.isNotBlank()) {
                             onAdd(
                                 name,
                                 phone,
@@ -616,17 +695,18 @@ fun AddPersonDialog(
                                 contactLookupKey,
                                 selectedTypeKey,
                                 if (hasInitialContact) initialContactDate else null,
-                                initialNote
+                                initialNote,
+                                customFrequency.toIntOrNull()?.takeIf { it > 0 }
                             )
-                    }
+                        }
                     },
                     enabled = name.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Kaydet")
+                    Text("Kişiyi kaydet")
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
