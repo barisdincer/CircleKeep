@@ -183,6 +183,34 @@ Tests should protect the portable behavior and the local-first data model.
 - UI or Android integration tests should cover platform wiring, not compensate
   for missing domain tests.
 
+## CI And Build Strategy Rule
+
+The main development machine for this project may be a Raspberry Pi or another
+low-power device. Full Android Gradle builds can be slow there, so GitHub
+Actions is the primary verification and APK production path.
+
+- Prefer pushing changes to GitHub and using GitHub Actions for
+  `testDebugUnitTest`, `assembleDebug`, and release APK generation.
+- Treat local Gradle builds on the Pi as a fallback path, not the default.
+- Use the local fallback only when GitHub Actions is unavailable, rate-limited,
+  broken for infrastructure reasons, or when a very small local check is clearly
+  faster than a CI round trip.
+- Do not spend long turns repeatedly rediscovering local Java/Android SDK setup.
+  If local fallback is needed, use cached tools and document any one-off setup
+  in the turn summary.
+- Do not commit `local.properties`; it is a machine-local SDK pointer.
+- If local Java is missing, a portable JDK can live outside the repo, for
+  example `/config/.cache/jdks/jdk-17`, and commands can be run with:
+  `JAVA_HOME=/config/.cache/jdks/jdk-17 PATH=/config/.cache/jdks/jdk-17/bin:$PATH`.
+- If local Android SDK is missing, command-line tools can live outside the repo,
+  for example `/config/.cache/android-sdk`. The local-only `local.properties`
+  may point to `sdk.dir=/config/.cache/android-sdk`, but that file must remain
+  uncommitted.
+- Local fallback commands, when explicitly needed, should pass both Java and
+  Android SDK paths explicitly, for example:
+  `JAVA_HOME=/config/.cache/jdks/jdk-17 ANDROID_HOME=/config/.cache/android-sdk ANDROID_SDK_ROOT=/config/.cache/android-sdk PATH=/config/.cache/jdks/jdk-17/bin:$PATH ./gradlew testDebugUnitTest`
+  and then `./gradlew assembleDebug` with the same environment.
+
 ## Performance Rule
 
 Optimize for understandable code first, then prevent obvious repeated work on
