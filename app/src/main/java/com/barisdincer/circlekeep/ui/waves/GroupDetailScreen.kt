@@ -69,7 +69,6 @@ import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.data.statusLabel
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
-import com.barisdincer.circlekeep.ui.people.AddPersonDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,7 +79,8 @@ fun GroupDetailScreen(
     waveId: Int,
     viewModel: NetworkViewModel,
     onBack: () -> Unit,
-    onPersonClick: (Int) -> Unit
+    onPersonClick: (Int) -> Unit,
+    onAddPersonToGroup: (Int) -> Unit
 ) {
     val waves by viewModel.waves.collectAsState()
     val people by viewModel.people.collectAsState()
@@ -96,7 +96,6 @@ fun GroupDetailScreen(
     val groupLogs = interactions.filter { it.personId in groupPersonIds }
     val noteLogs = groupLogs.filter { it.note.isNotBlank() }
 
-    var showNewPersonSheet by remember { mutableStateOf(false) }
     var showExistingPersonSheet by remember { mutableStateOf(false) }
     var showGroupLogSheet by remember { mutableStateOf(false) }
 
@@ -163,7 +162,7 @@ fun GroupDetailScreen(
                 GroupActionsCard(
                     memberCount = groupPeople.size,
                     frequencyDays = wave.frequencyDays,
-                    onNewPerson = { showNewPersonSheet = true },
+                    onNewPerson = { onAddPersonToGroup(wave.id) },
                     onExistingPerson = { showExistingPersonSheet = true },
                     onLogGroup = { showGroupLogSheet = true }
                 )
@@ -211,27 +210,6 @@ fun GroupDetailScreen(
                 val person = people.find { it.id == log.personId }
                 GroupNoteCard(log = log, personName = person?.name ?: "Kişi", contactTypes = contactTypes)
             }
-        }
-
-        if (showNewPersonSheet) {
-            AddPersonDialog(
-                waves = waves,
-                contactTypes = activeContactTypes,
-                initialWaveId = wave.id,
-                onDismiss = { showNewPersonSheet = false },
-                onAdd = { name, phone, selectedWaveId, contactLookupKey, initialType, initialTimestamp, initialNote ->
-                    viewModel.addPerson(
-                        name = name,
-                        phoneNumber = phone,
-                        waveId = selectedWaveId ?: wave.id,
-                        contactLookupKey = contactLookupKey,
-                        initialInteractionType = initialType,
-                        initialInteractionTimestamp = initialTimestamp,
-                        initialInteractionNote = initialNote
-                    )
-                    showNewPersonSheet = false
-                }
-            )
         }
 
         if (showExistingPersonSheet) {
