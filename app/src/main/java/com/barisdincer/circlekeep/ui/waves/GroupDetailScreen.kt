@@ -94,7 +94,6 @@ fun GroupDetailScreen(
     val groupPeople = people.filter { it.waveId == waveId }.sortedByTurkish { it.name }
     val groupPersonIds = groupPeople.map { it.id }.toSet()
     val groupLogs = interactions.filter { it.personId in groupPersonIds }
-    val noteLogs = groupLogs.filter { it.note.isNotBlank() }
 
     var showExistingPersonSheet by remember { mutableStateOf(false) }
     var showGroupLogSheet by remember { mutableStateOf(false) }
@@ -193,20 +192,20 @@ fun GroupDetailScreen(
             }
 
             item {
-                Text("Not geçmişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Temas geçmişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
-            if (noteLogs.isEmpty()) {
+            if (groupLogs.isEmpty()) {
                 item {
                     Text(
-                        "Bu grup için notlu temas kaydı yok.",
+                        "Bu grup için temas kaydı yok.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            items(noteLogs, key = { it.id }) { log ->
+            items(groupLogs, key = { it.id }) { log ->
                 val person = people.find { it.id == log.personId }
                 GroupNoteCard(log = log, personName = person?.name ?: "Kişi", contactTypes = contactTypes)
             }
@@ -344,7 +343,11 @@ private fun GroupNoteCard(log: InteractionLog, personName: String, contactTypes:
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(log.note, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                log.note.ifBlank { "Not eklenmemiş." },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (log.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
