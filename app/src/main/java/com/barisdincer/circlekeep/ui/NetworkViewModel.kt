@@ -74,7 +74,7 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
                 wave = dueContact.wave,
                 contactType = contactTypeFor(dueContact.person, types),
                 effectiveFrequencyDays = dueContact.effectiveFrequencyDays,
-                isDue = true,
+                isDue = false,
                 daysSinceLastInteraction = dueContact.daysSinceLastInteraction,
                 daysOverdue = dueContact.daysOverdue
             )
@@ -111,12 +111,15 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         val snoozed = people.mapNotNull { person ->
             val snoozedUntil = person.snoozedUntilDate ?: return@mapNotNull null
             if (snoozedUntil <= System.currentTimeMillis()) return@mapNotNull null
-            val wave = waves.find { it.id == person.waveId } ?: return@mapNotNull null
+            val wave = waves.find { it.id == person.waveId }
+            val frequencyDays = person.customFrequencyDays?.takeIf { it > 0 }
+                ?: wave?.frequencyDays
+                ?: return@mapNotNull null
             PersonWithWave(
                 person = person,
                 wave = wave,
                 contactType = contactTypeFor(person, types),
-                effectiveFrequencyDays = person.customFrequencyDays?.takeIf { it > 0 } ?: wave.frequencyDays,
+                effectiveFrequencyDays = frequencyDays,
                 isDue = false,
                 daysSinceLastInteraction = 0,
                 daysOverdue = 0,
@@ -197,7 +200,8 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         contactLookupKey: String? = null,
         initialInteractionType: String? = null,
         initialInteractionTimestamp: Long? = null,
-        initialInteractionNote: String = ""
+        initialInteractionNote: String = "",
+        customFrequencyDays: Int? = null
     ) {
         viewModelScope.launch {
             val trimmedName = name.trim()
@@ -211,7 +215,8 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
                     phoneNumber = phoneNumber,
                     contactLookupKey = contactLookupKey,
                     waveId = waveId,
-                    preferredContactTypeKey = initialInteractionType ?: DefaultContactTypes.CALL
+                    preferredContactTypeKey = initialInteractionType ?: DefaultContactTypes.CALL,
+                    customFrequencyDays = customFrequencyDays?.takeIf { it > 0 }
                 ),
                 initialInteractionType = initialInteractionType,
                 initialInteractionTimestamp = initialInteractionTimestamp,
