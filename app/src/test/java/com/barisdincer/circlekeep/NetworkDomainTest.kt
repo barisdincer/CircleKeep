@@ -8,6 +8,7 @@ import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.PhoneNumberNormalizer
 import com.barisdincer.circlekeep.data.Wave
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -92,6 +93,54 @@ class NetworkDomainTest {
         assertEquals(listOf("A"), dueContacts.map { it.person.name })
         assertEquals(10, dueContacts.first().effectiveFrequencyDays)
         assertEquals(2, dueContacts.first().daysOverdue)
+    }
+
+    @Test
+    fun `custom rhythm without group appears in next contacts`() {
+        val now = 100L * DAY_MILLIS
+        val customOnly = Person(
+            id = 1,
+            name = "A",
+            phoneNumber = "5321111111",
+            waveId = null,
+            customFrequencyDays = 90,
+            lastInteractionDate = now - 10L * DAY_MILLIS
+        )
+
+        val nextContacts = ContactReminderCalculator.nextContacts(
+            people = listOf(customOnly),
+            waves = emptyList(),
+            currentTimeMillis = now
+        )
+
+        assertEquals(listOf("A"), nextContacts.map { it.person.name })
+        assertNull(nextContacts.first().wave)
+        assertEquals(90, nextContacts.first().effectiveFrequencyDays)
+        assertEquals(-80L, nextContacts.first().daysOverdue)
+    }
+
+    @Test
+    fun `custom rhythm without group can become due`() {
+        val now = 100L * DAY_MILLIS
+        val customOnly = Person(
+            id = 1,
+            name = "A",
+            phoneNumber = "5321111111",
+            waveId = null,
+            customFrequencyDays = 90,
+            lastInteractionDate = now - 95L * DAY_MILLIS
+        )
+
+        val dueContacts = ContactReminderCalculator.dueContacts(
+            people = listOf(customOnly),
+            waves = emptyList(),
+            currentTimeMillis = now
+        )
+
+        assertEquals(listOf("A"), dueContacts.map { it.person.name })
+        assertNull(dueContacts.first().wave)
+        assertEquals(90, dueContacts.first().effectiveFrequencyDays)
+        assertEquals(5L, dueContacts.first().daysOverdue)
     }
 
     @Test
