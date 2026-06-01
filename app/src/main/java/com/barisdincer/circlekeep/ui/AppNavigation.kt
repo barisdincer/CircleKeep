@@ -44,6 +44,7 @@ import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.preferences.UserPreferencesStore
 import com.barisdincer.circlekeep.ui.dashboard.DashboardScreen
 import com.barisdincer.circlekeep.ui.logs.LogsScreen
+import com.barisdincer.circlekeep.ui.people.AddPersonScreen
 import com.barisdincer.circlekeep.ui.people.PeopleScreen
 import com.barisdincer.circlekeep.ui.people.PersonDetailScreen
 import com.barisdincer.circlekeep.ui.profile.ProfileScreen
@@ -93,6 +94,37 @@ fun AppNavigation(
                     viewModel = viewModel,
                     onPersonClick = { personId ->
                         navController.navigate("person_detail/$personId")
+                    },
+                    onAddPersonClick = {
+                        navController.navigate("add_person")
+                    }
+                )
+            }
+            composable(
+                route = "add_person?waveId={waveId}",
+                arguments = listOf(navArgument("waveId") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                })
+            ) { backStackEntry ->
+                val waveId = backStackEntry.arguments?.getInt("waveId")?.takeIf { it > 0 }
+                AddPersonScreen(
+                    waves = viewModel.waves.collectAsState().value,
+                    contactTypes = viewModel.activeContactTypes.collectAsState().value,
+                    initialWaveId = waveId,
+                    onBack = { navController.popBackStack() },
+                    onAdd = { name, phone, selectedWaveId, contactLookupKey, initialType, initialTimestamp, initialNote, customFrequencyDays ->
+                        viewModel.addPerson(
+                            name = name,
+                            phoneNumber = phone,
+                            waveId = selectedWaveId,
+                            contactLookupKey = contactLookupKey,
+                            initialInteractionType = initialType,
+                            initialInteractionTimestamp = initialTimestamp,
+                            initialInteractionNote = initialNote,
+                            customFrequencyDays = customFrequencyDays
+                        )
+                        navController.popBackStack()
                     }
                 )
             }
@@ -116,10 +148,13 @@ fun AppNavigation(
             composable("profile") {
                 ProfileScreen(
                     preferences = userPreferences,
+                    backupState = viewModel.backupState.collectAsState().value,
                     onBack = { navController.popBackStack() },
                     onLogsClick = { navController.navigate("logs") },
                     onSaveProfile = preferencesStore::updateProfile,
-                    onThemeModeChange = preferencesStore::updateThemeMode
+                    onThemeModeChange = preferencesStore::updateThemeMode,
+                    onCreateBackupJson = viewModel::createBackupJson,
+                    onRestoreBackupJson = viewModel::restoreBackupJson
                 )
             }
             composable(
@@ -144,6 +179,9 @@ fun AppNavigation(
                     onBack = { navController.popBackStack() },
                     onPersonClick = { personId ->
                         navController.navigate("person_detail/$personId")
+                    },
+                    onAddPersonToGroup = { selectedWaveId ->
+                        navController.navigate("add_person?waveId=$selectedWaveId")
                     }
                 )
             }
@@ -177,7 +215,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 onClick = { navController.navigateTopLevel("dashboard") }
             )
             CompactNavItem(
-                selected = currentDestination == "people" || currentDestination.startsWith("person_detail"),
+                selected = currentDestination == "people" || currentDestination.startsWith("person_detail") || currentDestination.startsWith("add_person"),
                 label = "Kişiler",
                 icon = Icons.Default.Group,
                 modifier = Modifier.weight(1f),
@@ -198,7 +236,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
                 onClick = { navController.navigateTopLevel("reports") }
             )
             CompactNavItem(
-                selected = currentDestination == "profile",
+                selected = currentDestination == "profile" || currentDestination == "logs",
                 label = "Profil",
                 icon = Icons.Default.Person,
                 modifier = Modifier.weight(1f),
@@ -235,8 +273,8 @@ private fun CompactNavItem(
 
 private fun NavHostController.navigateTopLevel(route: String) {
     navigate(route) {
-        popUpTo(graph.startDestinationId) { saveState = true }
+        popUpTo(graph.startDestinationId) { saveState = false }
         launchSingleTop = true
-        restoreState = true
+        restoreState = false
     }
 }
