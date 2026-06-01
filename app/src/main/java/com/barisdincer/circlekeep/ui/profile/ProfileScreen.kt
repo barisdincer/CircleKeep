@@ -1,5 +1,7 @@
 package com.barisdincer.circlekeep.ui.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +38,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -52,23 +55,55 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ThemeMode
 import com.barisdincer.circlekeep.data.UserPreferences
+import com.barisdincer.circlekeep.ui.BackupUiState
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
     preferences: UserPreferences,
+    backupState: BackupUiState,
     onBack: () -> Unit,
     onLogsClick: () -> Unit,
     onSaveProfile: (String, String, String) -> Unit,
-    onThemeModeChange: (ThemeMode) -> Unit
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onCreateBackupJson: ((String) -> Unit) -> Unit,
+    onRestoreBackupJson: (String) -> Unit
 ) {
     var displayName by remember { mutableStateOf(preferences.displayName) }
     var initials by remember { mutableStateOf(preferences.displayInitials) }
     var avatarColorKey by remember { mutableStateOf(preferences.avatarColorKey) }
+    val context = LocalContext.current
+    var pendingBackupJson by remember { mutableStateOf<String?>(null) }
+
+    val createBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val json = pendingBackupJson ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                outputStream.write(json.toByteArray())
+            }
+        }
+        pendingBackupJson = null
+    }
+
+    val restoreBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val json = context.contentResolver.openInputStream(uri)
+                ?.bufferedReader()
+                ?.use { it.readText() }
+            if (json != null) {
+                onRestoreBackupJson(json)
+            }
+        }
+    }
 
     LaunchedEffect(preferences) {
         displayName = preferences.displayName
@@ -190,6 +225,44 @@ fun ProfileScreen(
                         )
                     }
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("JSON yedeği", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        backupState.message ?: "Telefon değiştirmeden veya uygulamayı yeniden kurmadan önce yerel yedeğini alabilirsin.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = {
+                                onCreateBackupJson { json ->
+                                    pendingBackupJson = json
+                                    createBackupLauncher.launch("circlekeep-yedek.json")
+                                }
+                            }
+                        ) {
+                            Text("Dışa aktar")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                restoreBackupLauncher.launch(arrayOf("application/json", "text/*"))
+                            }
+                        ) {
+                            Text("Geri yükle")
+                        }
+                    }
                 }
             }
 
