@@ -97,6 +97,9 @@ interface NetworkDao {
     @Query("UPDATE people SET waveId = :waveId WHERE id = :personId")
     suspend fun updatePersonWave(personId: Int, waveId: Int?)
 
+    @Query("UPDATE people SET preferredContactTypeKey = :type WHERE id = :personId")
+    suspend fun updatePreferredContactType(personId: Int, type: String)
+
     @Query("UPDATE people SET lastInteractionDate = :date WHERE id = :personId")
     suspend fun updateLastInteraction(personId: Int, date: Long)
 
@@ -181,6 +184,7 @@ interface NetworkDao {
     @Transaction
     suspend fun logInteractionAndUpdatePerson(log: InteractionLog) {
         insertInteractionLog(log)
+        updatePreferredContactType(log.personId, log.type)
         refreshLastInteractionFromLogs(log.personId)
     }
 
@@ -188,6 +192,7 @@ interface NetworkDao {
     suspend fun logInteractionsAndUpdatePeople(logs: List<InteractionLog>) {
         logs.forEach { log ->
             insertInteractionLog(log)
+            updatePreferredContactType(log.personId, log.type)
             refreshLastInteractionFromLogs(log.personId)
         }
     }
