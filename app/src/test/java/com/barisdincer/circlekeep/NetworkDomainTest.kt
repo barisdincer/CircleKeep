@@ -7,6 +7,7 @@ import com.barisdincer.circlekeep.data.NetworkBackupCodec
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.PhoneNumberNormalizer
 import com.barisdincer.circlekeep.data.Wave
+import com.barisdincer.circlekeep.data.groupMemberRhythm
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -141,6 +142,24 @@ class NetworkDomainTest {
         assertNull(dueContacts.first().wave)
         assertEquals(90, dueContacts.first().effectiveFrequencyDays)
         assertEquals(5L, dueContacts.first().daysOverdue)
+    }
+
+    @Test
+    fun `group member rhythm tolerates invalid group frequency`() {
+        val now = 100L * DAY_MILLIS
+        val invalidGroup = Wave(id = 1, name = "Custom", frequencyDays = 0)
+        val person = Person(
+            id = 1,
+            name = "A",
+            phoneNumber = "5321111111",
+            waveId = invalidGroup.id,
+            lastInteractionDate = now
+        )
+
+        val rhythm = groupMemberRhythm(person, invalidGroup, now)
+
+        assertEquals(1, rhythm.effectiveFrequencyDays)
+        assertEquals(1L, rhythm.daysUntilDue)
     }
 
     @Test

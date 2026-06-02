@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Sms
@@ -33,15 +34,24 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () -> Unit) {
+fun PersonDetailScreen(
+    personId: Int,
+    viewModel: NetworkViewModel,
+    onBack: () -> Unit,
+    onDeleted: () -> Unit
+) {
     val people by viewModel.people.collectAsState()
     val person = people.find { it.id == personId }
+    val waves by viewModel.waves.collectAsState()
     val interactions by viewModel.allInteractions.collectAsState()
     val contactTypes by viewModel.contactTypes.collectAsState()
     val activeContactTypes by viewModel.activeContactTypes.collectAsState()
     val uiMessage by viewModel.uiMessage.collectAsState()
     val personInteractions = interactions.filter { it.personId == personId }.sortedByDescending { it.timestamp }
 
+    var editName by remember { mutableStateOf(person?.name.orEmpty()) }
+    var editPhone by remember { mutableStateOf(person?.phoneNumber.orEmpty()) }
+    var editWaveId by remember { mutableStateOf(person?.waveId) }
     var editReminderEnabled by remember { mutableStateOf(person?.reminderEnabled ?: true) }
     var editPreferredContactTypeKey by remember { mutableStateOf(person?.preferredContactTypeKey.orEmpty()) }
     var editNotes by remember { mutableStateOf(person?.notes ?: "") }
@@ -52,12 +62,18 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
     var editImportantLabel by remember { mutableStateOf(person?.importantDateLabel ?: "") }
     var editImportantDateMillis by remember { mutableStateOf(person?.importantDateMillis) }
     var editingLog by remember { mutableStateOf<InteractionLog?>(null) }
+    var deletingLog by remember { mutableStateOf<InteractionLog?>(null) }
+    var showDeletePersonDialog by remember { mutableStateOf(false) }
+    var waveExpanded by remember { mutableStateOf(false) }
     var typeExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(person) {
         if (person != null) {
+            editName = person.name
+            editPhone = person.phoneNumber
+            editWaveId = person.waveId
             editReminderEnabled = person.reminderEnabled
             editPreferredContactTypeKey = person.preferredContactTypeKey
             editNotes = person.notes
@@ -128,6 +144,104 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                          context.startActivity(intent)
                     }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Email, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Kişi bilgileri", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                "İsim, telefon ve grup bilgisini buradan düzenle.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        OutlinedTextField(
+                            value = editName,
+                            onValueChange = { editName = it },
+                            label = { Text("İsim") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        OutlinedTextField(
+                            value = editPhone,
+                            onValueChange = { editPhone = it },
+                            label = { Text("Telefon") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        ExposedDropdownMenuBox(
+                            expanded = waveExpanded,
+                            onExpandedChange = { waveExpanded = !waveExpanded }
+                        ) {
+                            val selectedWaveName = waves.find { it.id == editWaveId }?.name ?: "Grup yok"
+                            OutlinedTextField(
+                                value = selectedWaveName,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Grup") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = waveExpanded) },
+                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = waveExpanded,
+                                onDismissRequest = { waveExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Grup yok") },
+                                    onClick = {
+                                        editWaveId = null
+                                        waveExpanded = false
+                                    }
+                                )
+                                waves.forEach { wave ->
+                                    DropdownMenuItem(
+                                        text = { Text("${wave.name} (${wave.frequencyDays} gün)") },
+                                        onClick = {
+                                            editWaveId = wave.id
+                                            waveExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.updatePerson(
+                                    person.copy(
+                                        name = editName.trim(),
+                                        phoneNumber = editPhone,
+                                        waveId = editWaveId
+                                    )
+                                )
+                            },
+                            enabled = editName.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Kişiyi kaydet")
+                        }
+                        OutlinedButton(
+                            onClick = { showDeletePersonDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Kişiyi sil")
+                        }
                     }
                 }
             }
@@ -351,6 +465,13 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                         IconButton(onClick = { editingLog = log }) {
                             Icon(Icons.Default.Edit, contentDescription = "Temas kaydını düzenle")
                         }
+                        IconButton(onClick = { deletingLog = log }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Temas kaydını sil",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
@@ -364,6 +485,53 @@ fun PersonDetailScreen(personId: Int, viewModel: NetworkViewModel, onBack: () ->
                 onSave = { updated ->
                     viewModel.updateInteractionLog(updated)
                     editingLog = null
+                }
+            )
+        }
+
+        deletingLog?.let { log ->
+            AlertDialog(
+                onDismissRequest = { deletingLog = null },
+                title = { Text("Temas kaydı silinsin mi?") },
+                text = { Text("Bu kayıt geçmişten kaldırılır ve son temas tarihi yeniden hesaplanır.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteInteractionLog(log.id)
+                            deletingLog = null
+                        }
+                    ) {
+                        Text("Sil", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deletingLog = null }) {
+                        Text("Vazgeç")
+                    }
+                }
+            )
+        }
+
+        if (showDeletePersonDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeletePersonDialog = false },
+                title = { Text("${person.name} silinsin mi?") },
+                text = { Text("Kişi ve bu kişiye ait tüm temas geçmişi kalıcı olarak kaldırılır.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deletePerson(person.id)
+                            showDeletePersonDialog = false
+                            onDeleted()
+                        }
+                    ) {
+                        Text("Sil", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeletePersonDialog = false }) {
+                        Text("Vazgeç")
+                    }
                 }
             )
         }

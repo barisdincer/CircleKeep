@@ -240,6 +240,12 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
+    fun deletePerson(id: Int) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.deletePerson(id).message
+        }
+    }
+
     fun movePersonToWave(personId: Int, waveId: Int?) {
         viewModelScope.launch {
             repository.updatePersonWave(personId, waveId)

@@ -93,7 +93,9 @@ fun GroupDetailScreen(
     val wave = waves.find { it.id == waveId }
     val groupPeople = people.filter { it.waveId == waveId }.sortedByTurkish { it.name }
     val groupPersonIds = groupPeople.map { it.id }.toSet()
-    val groupLogs = interactions.filter { it.personId in groupPersonIds }
+    val groupLogs = interactions
+        .filter { it.personId in groupPersonIds }
+        .sortedByDescending { it.timestamp }
 
     var showExistingPersonSheet by remember { mutableStateOf(false) }
     var showGroupLogSheet by remember { mutableStateOf(false) }
@@ -160,7 +162,7 @@ fun GroupDetailScreen(
             item {
                 GroupActionsCard(
                     memberCount = groupPeople.size,
-                    frequencyDays = wave.frequencyDays,
+                    frequencyDays = wave.frequencyDays.coerceAtLeast(1),
                     onNewPerson = { onAddPersonToGroup(wave.id) },
                     onExistingPerson = { showExistingPersonSheet = true },
                     onLogGroup = { showGroupLogSheet = true }
@@ -205,7 +207,7 @@ fun GroupDetailScreen(
                 }
             }
 
-            items(groupLogs, key = { it.id }) { log ->
+            items(groupLogs, key = { "${it.id}-${it.personId}-${it.timestamp}-${it.type}" }) { log ->
                 val person = people.find { it.id == log.personId }
                 GroupNoteCard(log = log, personName = person?.name ?: "Kişi", contactTypes = contactTypes)
             }

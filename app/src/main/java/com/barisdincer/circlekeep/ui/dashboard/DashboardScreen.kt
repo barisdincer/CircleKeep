@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
@@ -77,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
-import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.contactActionLabel
 import com.barisdincer.circlekeep.data.sortedByTurkish
@@ -91,9 +89,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    viewModel: NetworkViewModel,
-    userPreferences: UserPreferences,
-    onProfileClick: () -> Unit
+    viewModel: NetworkViewModel
 ) {
     val dashboard by viewModel.dashboardReminders.collectAsState()
     val people by viewModel.people.collectAsState()
@@ -126,24 +122,6 @@ fun DashboardScreen(
                             Text("CircleKeep", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
                             val currentDate = SimpleDateFormat("d MMMM, EEEE", Locale("tr", "TR")).format(Date())
                             Text(currentDate, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    },
-                    actions = {
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 16.dp)
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .clickable(onClick = onProfileClick),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                userPreferences.displayInitials,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(

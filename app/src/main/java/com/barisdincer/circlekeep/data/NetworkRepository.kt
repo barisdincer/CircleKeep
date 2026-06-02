@@ -139,6 +139,13 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         networkDao.updatePerson(person.withNormalizedPhone())
     }
 
+    suspend fun deletePerson(id: Int): RepositoryActionResult {
+        val person = networkDao.getPersonById(id)
+            ?: return RepositoryActionResult(false, "Kişi bulunamadı.")
+        networkDao.deletePersonById(id)
+        return RepositoryActionResult(true, "${person.name} silindi.")
+    }
+
     suspend fun updatePersonWave(personId: Int, waveId: Int?) {
         networkDao.updatePersonWave(personId, waveId)
     }

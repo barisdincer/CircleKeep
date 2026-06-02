@@ -85,9 +85,7 @@ fun AppNavigation(
         ) {
             composable("dashboard") {
                 DashboardScreen(
-                    viewModel = viewModel,
-                    userPreferences = userPreferences,
-                    onProfileClick = { navController.navigate("profile") }
+                    viewModel = viewModel
                 )
             }
             composable("people") {
@@ -166,7 +164,10 @@ fun AppNavigation(
                 PersonDetailScreen(
                     personId = personId,
                     viewModel = viewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onDeleted = {
+                        navController.navigateTopLevel("people")
+                    }
                 )
             }
             composable(

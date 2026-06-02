@@ -16,7 +16,9 @@ fun groupMemberRhythm(
     wave: Wave,
     nowMillis: Long = System.currentTimeMillis()
 ): GroupMemberRhythm {
-    val frequencyDays = person.customFrequencyDays?.takeIf { it > 0 } ?: wave.frequencyDays
+    val frequencyDays = person.customFrequencyDays?.takeIf { it > 0 }
+        ?: wave.frequencyDays.takeIf { it > 0 }
+        ?: 1
     val daysSince = ((nowMillis - person.lastInteractionDate) / DAY_MILLIS).coerceAtLeast(0L)
     return GroupMemberRhythm(
         effectiveFrequencyDays = frequencyDays,
