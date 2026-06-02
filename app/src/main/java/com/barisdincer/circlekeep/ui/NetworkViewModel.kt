@@ -253,6 +253,12 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
+    fun movePeopleToWave(personIds: List<Int>, waveId: Int?) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.updatePeopleWave(personIds, waveId).message
+        }
+    }
+
     fun logInteraction(
         personId: Int,
         type: String,
@@ -300,6 +306,13 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
             }
             repository.snoozePerson(personId, calendar.timeInMillis)
             _uiMessage.value = "Yarın tekrar hatırlatılacak."
+        }
+    }
+
+    fun snoozePersonUntil(personId: Int, untilDate: Long) {
+        viewModelScope.launch {
+            repository.snoozePerson(personId, untilDate)
+            _uiMessage.value = "Hatırlatma ertelendi."
         }
     }
 

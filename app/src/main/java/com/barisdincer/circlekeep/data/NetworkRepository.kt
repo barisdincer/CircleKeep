@@ -150,6 +150,15 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         networkDao.updatePersonWave(personId, waveId)
     }
 
+    suspend fun updatePeopleWave(personIds: List<Int>, waveId: Int?): RepositoryActionResult {
+        val distinctIds = personIds.distinct().filter { it > 0 }
+        if (distinctIds.isEmpty()) {
+            return RepositoryActionResult(false, "Kişi seçilmedi.")
+        }
+        networkDao.updatePeopleWave(distinctIds, waveId)
+        return RepositoryActionResult(true, "${distinctIds.size} kişi gruba eklendi.")
+    }
+
     suspend fun logInteraction(
         personId: Int,
         type: String,

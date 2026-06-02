@@ -217,8 +217,8 @@ fun GroupDetailScreen(
             ExistingPersonSheet(
                 people = people.filter { it.waveId != wave.id },
                 onDismiss = { showExistingPersonSheet = false },
-                onSelect = { personId ->
-                    viewModel.movePersonToWave(personId, wave.id)
+                onSave = { personIds ->
+                    viewModel.movePeopleToWave(personIds, wave.id)
                     showExistingPersonSheet = false
                 }
             )
@@ -375,25 +375,98 @@ private fun EmptyGroupCard() {
 private fun ExistingPersonSheet(
     people: List<Person>,
     onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit
+    onSave: (List<Int>) -> Unit
 ) {
+    var selectedPersonIds by remember(people) { mutableStateOf(emptySet<Int>()) }
+    val sortedPeople = people.sortedByTurkish { it.name }
+
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Mevcut kişiyi ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Mevcut kişileri ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Birden fazla kişiyi seçip gruba tek seferde ekleyebilirsin.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             if (people.isEmpty()) {
                 Text("Gruba eklenebilecek başka kişi yok.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            people.sortedByTurkish { it.name }.forEach { person ->
-                Surface(
+            if (sortedPeople.isNotEmpty()) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    onClick = { onSelect(person.id) }
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(person.name, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Medium)
+                    Text("${selectedPersonIds.size} kişi seçili", style = MaterialTheme.typography.labelLarge)
+                    TextButton(
+                        onClick = {
+                            selectedPersonIds = if (selectedPersonIds.size == sortedPeople.size) {
+                                emptySet()
+                            } else {
+                                sortedPeople.map { it.id }.toSet()
+                            }
+                        }
+                    ) {
+                        Text(if (selectedPersonIds.size == sortedPeople.size) "Temizle" else "Tümünü seç")
+                    }
+                }
+            }
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(sortedPeople, key = { it.id }) { person ->
+                    val checked = person.id in selectedPersonIds
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (checked) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        },
+                        onClick = {
+                            selectedPersonIds = if (checked) {
+                                selectedPersonIds - person.id
+                            } else {
+                                selectedPersonIds + person.id
+                            }
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = {
+                                    selectedPersonIds = if (checked) {
+                                        selectedPersonIds - person.id
+                                    } else {
+                                        selectedPersonIds + person.id
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(person.name, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) {
+                    Text("Vazgeç")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    enabled = selectedPersonIds.isNotEmpty(),
+                    onClick = { onSave(selectedPersonIds.toList()) },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Gruba ekle")
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))

@@ -97,6 +97,9 @@ interface NetworkDao {
     @Query("UPDATE people SET waveId = :waveId WHERE id = :personId")
     suspend fun updatePersonWave(personId: Int, waveId: Int?)
 
+    @Query("UPDATE people SET waveId = :waveId WHERE id IN (:personIds)")
+    suspend fun updatePeopleWave(personIds: List<Int>, waveId: Int?)
+
     @Query("UPDATE people SET preferredContactTypeKey = :type WHERE id = :personId")
     suspend fun updatePreferredContactType(personId: Int, type: String)
 

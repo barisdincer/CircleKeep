@@ -64,6 +64,22 @@ class NetworkRepositoryTest {
     }
 
     @Test
+    fun `multiple existing people can be moved into group together`() = runBlocking {
+        repository.insertWave(Wave(id = 1, name = "Yakınlar", frequencyDays = 7))
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null))
+        repository.insertPerson(Person(id = 2, name = "Mehmet", phoneNumber = "5322222222", waveId = null))
+        repository.insertPerson(Person(id = 3, name = "Zeynep", phoneNumber = "5323333333", waveId = null))
+
+        val result = repository.updatePeopleWave(listOf(1, 2, 2), 1)
+
+        val peopleById = repository.getPeopleSnapshot().associateBy { it.id }
+        assertTrue(result.success)
+        assertEquals(1, peopleById[1]?.waveId)
+        assertEquals(1, peopleById[2]?.waveId)
+        assertEquals(null, peopleById[3]?.waveId)
+    }
+
+    @Test
     fun `used contact type delete is blocked`() = runBlocking {
         val type = ContactType(key = "CUSTOM_COFFEE", label = "Kahve", isActive = true, sortOrder = 10)
         database.networkDao().insertContactType(type)
