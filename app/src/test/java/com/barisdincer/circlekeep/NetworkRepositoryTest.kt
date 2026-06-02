@@ -178,6 +178,41 @@ class NetworkRepositoryTest {
     }
 
     @Test
+    fun `interaction logs update only matching contact rhythm`() = runBlocking {
+        val callTime = 1_700_000_000_000L
+        val meetingTime = 1_700_100_000_000L
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, lastInteractionDate = 1L))
+
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = callTime)
+        repository.logInteraction(personId = 1, type = DefaultContactTypes.MEETING, timestamp = meetingTime)
+
+        val rhythms = repository.getPersonContactRhythmSnapshot().associateBy { it.contactTypeKey }
+        assertEquals(callTime, rhythms[DefaultContactTypes.CALL]?.lastInteractionDate)
+        assertEquals(meetingTime, rhythms[DefaultContactTypes.MEETING]?.lastInteractionDate)
+        assertEquals(meetingTime, repository.getPeopleSnapshot().single().lastInteractionDate)
+    }
+
+    @Test
+    fun `updating person custom frequency syncs all selected contact rhythms`() = runBlocking {
+        repository.insertPerson(
+            Person(
+                id = 1,
+                name = "Ayse",
+                phoneNumber = "5321111111",
+                waveId = null,
+                customFrequencyDays = 90
+            )
+        )
+        repository.setPersonContactRhythmActive(1, DefaultContactTypes.MEETING, true)
+
+        val person = repository.getPeopleSnapshot().single()
+        repository.updatePerson(person.copy(customFrequencyDays = 45))
+
+        val rhythms = repository.getPersonContactRhythmSnapshot().sortedBy { it.contactTypeKey }
+        assertEquals(listOf(45, 45), rhythms.map { it.customFrequencyDays })
+    }
+
+    @Test
     fun `backdated interaction does not replace newer last interaction`() = runBlocking {
         repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
         repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 300L)

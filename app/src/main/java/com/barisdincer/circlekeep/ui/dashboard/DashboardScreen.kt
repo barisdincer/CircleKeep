@@ -55,7 +55,7 @@ fun DashboardScreen(
     val focusContacts = remember(dashboard.overdue, dashboard.today) {
         (dashboard.overdue + dashboard.today).sortedWith(
             compareByDescending<PersonWithWave> { it.daysOverdue }
-                .thenBy { it.person.lastInteractionDate }
+                .thenBy { it.lastInteractionDate }
         )
     }
 
@@ -100,15 +100,8 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                DashboardHeroCard(
-                    peopleCount = people.size,
-                    todayCount = dashboard.today.size,
-                    overdueCount = dashboard.overdue.size,
-                    snoozedCount = dashboard.snoozed.size,
-                    upcomingCount = dashboard.upcoming.size,
+                DashboardActionBar(
                     recentInteractionCount = interactions.size,
-                    topContact = focusContacts.firstOrNull(),
-                    nextContact = dashboard.upcoming.firstOrNull(),
                     syncMessage = syncState.message,
                     isSyncing = syncState.isSyncing,
                     onSync = { viewModel.syncCallLog(context) },
@@ -130,7 +123,7 @@ fun DashboardScreen(
                 }
             }
 
-            items(focusContacts, key = { it.person.id }) { contact ->
+            items(focusContacts, key = { "${it.person.id}-${it.contactType.key}" }) { contact ->
                 ReminderCard(
                     contact = contact,
                     onLog = { logSheet = ContactLogSheetState.Single(contact) },
@@ -146,7 +139,7 @@ fun DashboardScreen(
                         subtitle = "Seçtiğin tarihe kadar ana listeden saklanır; günü gelince tekrar görünür."
                     )
                 }
-                items(dashboard.snoozed, key = { it.person.id }) { contact ->
+                items(dashboard.snoozed, key = { "${it.person.id}-${it.contactType.key}" }) { contact ->
                     ReminderCard(
                         contact = contact,
                         onLog = { logSheet = ContactLogSheetState.Single(contact) },
@@ -156,22 +149,15 @@ fun DashboardScreen(
             }
 
             item {
-                UpcomingSectionTitle(
+                UpcomingSectionPanel(
                     count = dashboard.upcoming.size,
                     expanded = showUpcoming,
                     nextContact = dashboard.upcoming.firstOrNull(),
-                    onToggle = { showUpcoming = !showUpcoming }
+                    contacts = dashboard.upcoming,
+                    onToggle = { showUpcoming = !showUpcoming },
+                    onLog = { contact -> logSheet = ContactLogSheetState.Single(contact) },
+                    onSnooze = { contact -> snoozeTarget = contact }
                 )
-            }
-
-            if (showUpcoming) {
-                items(dashboard.upcoming, key = { it.person.id }) { contact ->
-                    ReminderCard(
-                        contact = contact,
-                        onLog = { logSheet = ContactLogSheetState.Single(contact) },
-                        onSnooze = { snoozeTarget = contact }
-                    )
-                }
             }
         }
 
@@ -194,7 +180,7 @@ fun DashboardScreen(
                 contact = contact,
                 onDismiss = { snoozeTarget = null },
                 onSave = { untilDate ->
-                    viewModel.snoozePersonUntil(contact.person.id, untilDate)
+                    viewModel.snoozeContactTypeUntil(contact.person.id, contact.contactType.key, untilDate)
                     snoozeTarget = null
                 }
             )

@@ -70,6 +70,7 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
     val waves by viewModel.waves.collectAsState()
     val people by viewModel.people.collectAsState()
     val interactions by viewModel.interactions.collectAsState()
+    val contactRhythms by viewModel.personContactRhythms.collectAsState()
     val contactTypes by viewModel.activeContactTypes.collectAsState()
     val managementMessage by viewModel.managementMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -172,7 +173,7 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
                 items(contactTypes, key = { it.key }) { type ->
                     ContactTypeCard(
                         type = type,
-                        usageCount = people.count { it.preferredContactTypeKey == type.key } + interactions.count { it.type == type.key },
+                        usageCount = contactRhythms.count { it.contactTypeKey == type.key } + interactions.count { it.type == type.key },
                         onEdit = { sheetState = ManagementSheet.EditContactType(type) },
                         onDelete = { sheetState = ManagementSheet.DeleteContactType(type) }
                     )

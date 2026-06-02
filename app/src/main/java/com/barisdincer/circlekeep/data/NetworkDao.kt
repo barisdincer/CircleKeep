@@ -137,6 +137,91 @@ interface NetworkDao {
     @Query("DELETE FROM people WHERE id = :id")
     suspend fun deletePersonById(id: Int)
 
+    // Person contact rhythms
+    @Query("SELECT * FROM person_contact_rhythms")
+    fun getAllPersonContactRhythms(): Flow<List<PersonContactRhythm>>
+
+    @Query("SELECT * FROM person_contact_rhythms")
+    suspend fun getPersonContactRhythmSnapshot(): List<PersonContactRhythm>
+
+    @Query("SELECT * FROM person_contact_rhythms WHERE personId = :personId")
+    suspend fun getPersonContactRhythmsForPerson(personId: Int): List<PersonContactRhythm>
+
+    @Query("SELECT COUNT(*) FROM person_contact_rhythms WHERE contactTypeKey = :key AND isActive = 1")
+    suspend fun countPersonContactRhythmsByType(key: String): Int
+
+    @Query("DELETE FROM person_contact_rhythms WHERE contactTypeKey = :key AND isActive = 0")
+    suspend fun deleteInactivePersonContactRhythmsByType(key: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPersonContactRhythm(rhythm: PersonContactRhythm)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPersonContactRhythms(rhythms: List<PersonContactRhythm>)
+
+    @Query(
+        """
+        INSERT OR IGNORE INTO person_contact_rhythms(
+            personId, contactTypeKey, isActive, customFrequencyDays, lastInteractionDate, snoozedUntilDate
+        )
+        SELECT id, :type, 1, customFrequencyDays, lastInteractionDate, NULL
+        FROM people
+        WHERE id = :personId
+        """
+    )
+    suspend fun insertPersonContactRhythmIfMissing(personId: Int, type: String)
+
+    @Query(
+        """
+        UPDATE person_contact_rhythms
+        SET isActive = :isActive
+        WHERE personId = :personId AND contactTypeKey = :type
+        """
+    )
+    suspend fun updatePersonContactRhythmActive(personId: Int, type: String, isActive: Boolean)
+
+    @Query(
+        """
+        UPDATE person_contact_rhythms
+        SET lastInteractionDate = :date
+        WHERE personId = :personId AND contactTypeKey = :type
+        """
+    )
+    suspend fun updatePersonContactRhythmLastInteraction(personId: Int, type: String, date: Long)
+
+    @Query(
+        """
+        UPDATE person_contact_rhythms
+        SET snoozedUntilDate = :date
+        WHERE personId = :personId AND contactTypeKey = :type
+        """
+    )
+    suspend fun updatePersonContactRhythmSnooze(personId: Int, type: String, date: Long?)
+
+    @Query(
+        """
+        UPDATE person_contact_rhythms
+        SET customFrequencyDays = :customFrequencyDays
+        WHERE personId = :personId
+        """
+    )
+    suspend fun updatePersonContactRhythmsCustomFrequency(personId: Int, customFrequencyDays: Int?)
+
+    @Query(
+        """
+        UPDATE person_contact_rhythms
+        SET isActive = 1,
+            lastInteractionDate = COALESCE(
+                (SELECT MAX(timestamp) FROM interaction_logs WHERE personId = :personId AND type = :type),
+                (SELECT addedDate FROM people WHERE id = :personId),
+                lastInteractionDate
+            ),
+            snoozedUntilDate = NULL
+        WHERE personId = :personId AND contactTypeKey = :type
+        """
+    )
+    suspend fun refreshPersonContactRhythmFromLogs(personId: Int, type: String)
+
     // Interactions
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInteractionLog(log: InteractionLog)
@@ -162,6 +247,9 @@ interface NetworkDao {
     @Query("SELECT MAX(timestamp) FROM interaction_logs WHERE personId = :personId")
     suspend fun getLatestInteractionTimestampForPerson(personId: Int): Long?
 
+    @Query("SELECT MAX(timestamp) FROM interaction_logs WHERE personId = :personId AND type = :type")
+    suspend fun getLatestInteractionTimestampForPersonAndType(personId: Int, type: String): Long?
+
     @Query("SELECT COUNT(*) FROM interaction_logs WHERE type = :type")
     suspend fun countInteractionLogsByType(type: String): Int
 
@@ -183,11 +271,16 @@ interface NetworkDao {
     @Query("DELETE FROM waves")
     suspend fun clearWaves()
 
+    @Query("DELETE FROM person_contact_rhythms")
+    suspend fun clearPersonContactRhythms()
+
     // Transaction to log interaction and update person
     @Transaction
     suspend fun logInteractionAndUpdatePerson(log: InteractionLog) {
         insertInteractionLog(log)
         updatePreferredContactType(log.personId, log.type)
+        insertPersonContactRhythmIfMissing(log.personId, log.type)
+        refreshPersonContactRhythmFromLogs(log.personId, log.type)
         refreshLastInteractionFromLogs(log.personId)
     }
 
@@ -196,6 +289,8 @@ interface NetworkDao {
         logs.forEach { log ->
             insertInteractionLog(log)
             updatePreferredContactType(log.personId, log.type)
+            insertPersonContactRhythmIfMissing(log.personId, log.type)
+            refreshPersonContactRhythmFromLogs(log.personId, log.type)
             refreshLastInteractionFromLogs(log.personId)
         }
     }
@@ -203,6 +298,8 @@ interface NetworkDao {
     @Transaction
     suspend fun logCallInteractionAndUpdatePerson(log: InteractionLog) {
         insertInteractionLog(log)
+        insertPersonContactRhythmIfMissing(log.personId, log.type)
+        refreshPersonContactRhythmFromLogs(log.personId, log.type)
         updateLastCallLogInteraction(log.personId, log.timestamp)
     }
 
@@ -211,15 +308,20 @@ interface NetworkDao {
         contactTypes: List<ContactType>,
         waves: List<Wave>,
         people: List<Person>,
+        rhythms: List<PersonContactRhythm>,
         logs: List<InteractionLog>
     ) {
         clearInteractionLogs()
+        clearPersonContactRhythms()
         clearPeople()
         clearWaves()
         clearContactTypes()
         insertContactTypes(contactTypes)
         insertWaves(waves)
         insertPeople(people)
+        if (rhythms.isNotEmpty()) {
+            insertPersonContactRhythms(rhythms)
+        }
         insertInteractionLogs(logs)
     }
 }

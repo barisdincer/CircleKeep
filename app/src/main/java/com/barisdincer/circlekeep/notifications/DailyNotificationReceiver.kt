@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import com.barisdincer.circlekeep.MainActivity
 import com.barisdincer.circlekeep.NetworkApplication
 import com.barisdincer.circlekeep.data.ContactReminderCalculator
+import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.device.CallLogSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,18 +28,27 @@ class DailyNotificationReceiver : BroadcastReceiver() {
 
                 val dueContacts = ContactReminderCalculator.dueContacts(
                     people = app.repository.getPeopleSnapshot(),
-                    waves = app.repository.getWaveSnapshot()
+                    waves = app.repository.getWaveSnapshot(),
+                    rhythms = app.repository.getPersonContactRhythmSnapshot()
                 )
 
                 if (dueContacts.isNotEmpty()) {
-                    val names = dueContacts.take(3).joinToString(", ") { it.person.name }
-                    val primaryPersonId = dueContacts.first().person.id
+                    val names = dueContacts.take(3).joinToString(", ") {
+                        "${it.person.name} (${contactTypeLabel(it.contactTypeKey)})"
+                    }
+                    val primaryContact = dueContacts.first()
                     val message = if (dueContacts.size == 1) {
                         "${dueContacts.first().person.name} ile hal hatır sorma zamanı."
                     } else {
-                        "Bugün ${dueContacts.size} kişi için zaman geldi: $names"
+                        "Bugün ${dueContacts.size} ritim için zaman geldi: $names"
                     }
-                    showNotification(context, "Hal hatır zamanı", message, primaryPersonId)
+                    showNotification(
+                        context = context,
+                        title = "Hal hatır zamanı",
+                        message = message,
+                        primaryPersonId = primaryContact.person.id,
+                        contactTypeKey = primaryContact.contactTypeKey
+                    )
                 }
             } finally {
                 pendingResult.finish()
@@ -46,7 +56,13 @@ class DailyNotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showNotification(context: Context, title: String, message: String, primaryPersonId: Int) {
+    private fun showNotification(
+        context: Context,
+        title: String,
+        message: String,
+        primaryPersonId: Int,
+        contactTypeKey: String
+    ) {
         val channelId = "circlekeep_daily_reminders"
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -76,6 +92,7 @@ class DailyNotificationReceiver : BroadcastReceiver() {
         val calledIntent = Intent(context, ReminderActionReceiver::class.java).apply {
             action = ReminderActions.ACTION_LOG_CALL
             putExtra(ReminderActions.EXTRA_PERSON_ID, primaryPersonId)
+            putExtra(ReminderActions.EXTRA_CONTACT_TYPE_KEY, contactTypeKey)
         }
         val calledPendingIntent = PendingIntent.getBroadcast(
             context,
@@ -87,6 +104,7 @@ class DailyNotificationReceiver : BroadcastReceiver() {
         val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
             action = ReminderActions.ACTION_SNOOZE_TOMORROW
             putExtra(ReminderActions.EXTRA_PERSON_ID, primaryPersonId)
+            putExtra(ReminderActions.EXTRA_CONTACT_TYPE_KEY, contactTypeKey)
         }
         val snoozePendingIntent = PendingIntent.getBroadcast(
             context,
@@ -103,9 +121,18 @@ class DailyNotificationReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_menu_call, "Arama kaydet", calledPendingIntent)
+            .addAction(android.R.drawable.ic_menu_call, "Temas kaydet", calledPendingIntent)
             .addAction(android.R.drawable.ic_menu_recent_history, "Yarın", snoozePendingIntent)
 
         notificationManager.notify(ReminderActions.NOTIFICATION_ID, builder.build())
+    }
+
+    private fun contactTypeLabel(key: String): String {
+        return when (key) {
+            DefaultContactTypes.CALL -> "Arama"
+            DefaultContactTypes.MESSAGE -> "Mesaj"
+            DefaultContactTypes.MEETING -> "Buluşma"
+            else -> key
+        }
     }
 }

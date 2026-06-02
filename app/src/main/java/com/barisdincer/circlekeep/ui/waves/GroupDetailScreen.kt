@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
@@ -99,6 +101,8 @@ fun GroupDetailScreen(
 
     var showExistingPersonSheet by remember { mutableStateOf(false) }
     var showGroupLogSheet by remember { mutableStateOf(false) }
+    var editingLog by remember { mutableStateOf<InteractionLog?>(null) }
+    var deletingLog by remember { mutableStateOf<InteractionLog?>(null) }
 
     LaunchedEffect(uiMessage) {
         val message = uiMessage ?: return@LaunchedEffect
@@ -209,7 +213,13 @@ fun GroupDetailScreen(
 
             items(groupLogs, key = { "${it.id}-${it.personId}-${it.timestamp}-${it.type}" }) { log ->
                 val person = people.find { it.id == log.personId }
-                GroupNoteCard(log = log, personName = person?.name ?: "Kişi", contactTypes = contactTypes)
+                GroupNoteCard(
+                    log = log,
+                    personName = person?.name ?: "Kişi",
+                    contactTypes = contactTypes,
+                    onEdit = { editingLog = log },
+                    onDelete = { deletingLog = log }
+                )
             }
         }
 
@@ -232,6 +242,29 @@ fun GroupDetailScreen(
                 onSave = { personIds, type, note, timestamp ->
                     viewModel.logInteractions(personIds, type, note, timestamp)
                     showGroupLogSheet = false
+                }
+            )
+        }
+
+        editingLog?.let { log ->
+            EditGroupLogSheet(
+                log = log,
+                contactTypes = contactTypes,
+                onDismiss = { editingLog = null },
+                onSave = { updated ->
+                    viewModel.updateInteractionLog(updated)
+                    editingLog = null
+                }
+            )
+        }
+
+        deletingLog?.let { log ->
+            DeleteGroupLogSheet(
+                log = log,
+                onDismiss = { deletingLog = null },
+                onDelete = {
+                    viewModel.deleteInteractionLog(log.id)
+                    deletingLog = null
                 }
             )
         }
@@ -328,28 +361,6 @@ private fun GroupMemberCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun GroupNoteCard(log: InteractionLog, personName: String, contactTypes: List<ContactType>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                "$personName · ${interactionTypeLabel(log.type, contactTypes)} · ${formatShortDate(log.timestamp)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                log.note.ifBlank { "Not eklenmemiş." },
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (log.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-            )
         }
     }
 }
@@ -595,17 +606,4 @@ private fun GroupContactLogSheet(
             Spacer(modifier = Modifier.height(10.dp))
         }
     }
-}
-
-private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>): String {
-    return contactTypes.find { it.key == type }?.label ?: when (type) {
-        DefaultContactTypes.CALL -> "Arama"
-        DefaultContactTypes.MESSAGE -> "Mesaj"
-        DefaultContactTypes.MEETING -> "Buluşma"
-        else -> type
-    }
-}
-
-private fun formatShortDate(timestamp: Long): String {
-    return SimpleDateFormat("d MMM yyyy", Locale("tr", "TR")).format(Date(timestamp))
 }

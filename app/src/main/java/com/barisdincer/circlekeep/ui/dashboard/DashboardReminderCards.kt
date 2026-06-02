@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +20,9 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Button
@@ -45,6 +48,52 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
+internal fun DashboardActionBar(
+    recentInteractionCount: Int,
+    syncMessage: String?,
+    isSyncing: Boolean,
+    onSync: () -> Unit,
+    onOpenBatchLog: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onOpenBatchLog,
+                    modifier = Modifier.weight(1f).height(42.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Icon(Icons.Default.EditNote, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Etkinlik ekle")
+                }
+                FilledTonalButton(
+                    enabled = !isSyncing,
+                    onClick = onSync,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Aramaları eşle")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (isSyncing) "Eşleniyor" else "Eşle")
+                }
+            }
+            Text(
+                syncMessage ?: "Son listede $recentInteractionCount temas kaydı var.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 internal fun ReminderSectionTitle(
     title: String,
     count: Int,
@@ -64,11 +113,14 @@ internal fun ReminderSectionTitle(
 }
 
 @Composable
-internal fun UpcomingSectionTitle(
+internal fun UpcomingSectionPanel(
     count: Int,
     expanded: Boolean,
     nextContact: PersonWithWave?,
-    onToggle: () -> Unit
+    contacts: List<PersonWithWave>,
+    onToggle: () -> Unit,
+    onLog: (PersonWithWave) -> Unit,
+    onSnooze: (PersonWithWave) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -79,26 +131,45 @@ internal fun UpcomingSectionTitle(
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Sıradakiler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    nextContact?.let { "${it.person.name} · ${it.statusText()} · ${it.contactType.label}" }
-                        ?: "Yaklaşan ritim yok.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Column {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Sıradakiler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        nextContact?.let { "${it.person.name} · ${it.statusText()} · ${it.contactType.label}" }
+                            ?: "Yaklaşan ritim yok.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CountPill(count)
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Kapat" else "Aç"
+                    )
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CountPill(count)
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) "Kapat" else "Aç"
-                )
+            if (expanded && contacts.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    contacts.forEach { contact ->
+                        ReminderCard(
+                            contact = contact,
+                            onLog = { onLog(contact) },
+                            onSnooze = { onSnooze(contact) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -191,7 +262,7 @@ internal fun ReminderCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "Son temas: ${formatShortDate(contact.person.lastInteractionDate)} · ${contact.daysSinceLastInteraction} gün önce",
+                    "Son temas: ${formatShortDate(contact.lastInteractionDate)} · ${contact.daysSinceLastInteraction} gün önce",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

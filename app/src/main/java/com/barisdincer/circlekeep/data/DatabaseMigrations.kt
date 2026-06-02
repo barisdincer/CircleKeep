@@ -106,7 +106,59 @@ object DatabaseMigrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS person_contact_rhythms (
+                    personId INTEGER NOT NULL,
+                    contactTypeKey TEXT NOT NULL,
+                    isActive INTEGER NOT NULL DEFAULT 1,
+                    customFrequencyDays INTEGER,
+                    lastInteractionDate INTEGER,
+                    snoozedUntilDate INTEGER,
+                    PRIMARY KEY(personId, contactTypeKey),
+                    FOREIGN KEY(personId) REFERENCES people(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_person_contact_rhythms_personId ON person_contact_rhythms(personId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_person_contact_rhythms_contactTypeKey ON person_contact_rhythms(contactTypeKey)")
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO person_contact_rhythms(
+                    personId, contactTypeKey, isActive, customFrequencyDays, lastInteractionDate, snoozedUntilDate
+                )
+                SELECT
+                    id,
+                    preferredContactTypeKey,
+                    1,
+                    customFrequencyDays,
+                    lastInteractionDate,
+                    snoozedUntilDate
+                FROM people
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO person_contact_rhythms(
+                    personId, contactTypeKey, isActive, customFrequencyDays, lastInteractionDate, snoozedUntilDate
+                )
+                SELECT
+                    personId,
+                    type,
+                    1,
+                    NULL,
+                    MAX(timestamp),
+                    NULL
+                FROM interaction_logs
+                GROUP BY personId, type
+                """.trimIndent()
+            )
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
     private const val PHONE_DIGITS_SQL =
         "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phoneNumber, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')"

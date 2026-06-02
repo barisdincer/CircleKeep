@@ -5,6 +5,7 @@ import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.NetworkBackupCodec
 import com.barisdincer.circlekeep.data.Person
+import com.barisdincer.circlekeep.data.PersonContactRhythm
 import com.barisdincer.circlekeep.data.PhoneNumberNormalizer
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.groupMemberRhythm
@@ -196,6 +197,49 @@ class NetworkDomainTest {
     }
 
     @Test
+    fun `same person can have separate reminders for multiple contact types`() {
+        val now = 100L * DAY_MILLIS
+        val group = Wave(id = 1, name = "Friends", frequencyDays = 30)
+        val person = Person(
+            id = 1,
+            name = "Ayse",
+            phoneNumber = "5321111111",
+            waveId = group.id,
+            lastInteractionDate = now - 5L * DAY_MILLIS
+        )
+        val rhythms = listOf(
+            PersonContactRhythm(
+                personId = person.id,
+                contactTypeKey = DefaultContactTypes.CALL,
+                lastInteractionDate = now - 35L * DAY_MILLIS
+            ),
+            PersonContactRhythm(
+                personId = person.id,
+                contactTypeKey = DefaultContactTypes.MEETING,
+                lastInteractionDate = now - 10L * DAY_MILLIS
+            )
+        )
+
+        val dueContacts = ContactReminderCalculator.dueContacts(
+            people = listOf(person),
+            waves = listOf(group),
+            rhythms = rhythms,
+            currentTimeMillis = now
+        )
+        val nextContacts = ContactReminderCalculator.nextContacts(
+            people = listOf(person),
+            waves = listOf(group),
+            rhythms = rhythms,
+            currentTimeMillis = now
+        )
+
+        assertEquals(listOf(DefaultContactTypes.CALL), dueContacts.map { it.contactTypeKey })
+        assertEquals(5L, dueContacts.first().daysOverdue)
+        assertEquals(listOf(DefaultContactTypes.MEETING), nextContacts.map { it.contactTypeKey })
+        assertEquals(-20L, nextContacts.first().daysOverdue)
+    }
+
+    @Test
     fun `backup includes relationship rhythm and memory fields`() {
         val wave = Wave(id = 1, name = "Friends", frequencyDays = 21)
         val person = Person(
@@ -210,6 +254,11 @@ class NetworkDomainTest {
             importantDateLabel = "Dogum gunu",
             importantDateMillis = 1234L
         )
+        val rhythm = PersonContactRhythm(
+            personId = 1,
+            contactTypeKey = DefaultContactTypes.MEETING,
+            lastInteractionDate = 2000L
+        )
         val log = InteractionLog(id = 1, personId = 1, timestamp = 2000L, type = DefaultContactTypes.MEETING, note = "Kisa bir kahve")
 
         val decoded = NetworkBackupCodec.decode(
@@ -217,6 +266,7 @@ class NetworkDomainTest {
                 contactTypes = DefaultContactTypes.all,
                 waves = listOf(wave),
                 people = listOf(person),
+                rhythms = listOf(rhythm),
                 logs = listOf(log)
             )
         )
@@ -228,6 +278,7 @@ class NetworkDomainTest {
         assertEquals("Yeni işi sor", decoded.people.first().nextConversationHint)
         assertEquals("Dogum gunu", decoded.people.first().importantDateLabel)
         assertEquals(1234L, decoded.people.first().importantDateMillis)
+        assertEquals(DefaultContactTypes.MEETING, decoded.rhythms.first().contactTypeKey)
         assertEquals("Kisa bir kahve", decoded.logs.first().note)
     }
 
@@ -249,7 +300,10 @@ class NetworkDomainTest {
                 "addedDate": 1000,
                 "lastInteractionDate": 1000
               }],
-              "interactionLogs": [{"id": 1, "personId": 1, "timestamp": 1000, "type": "CALL"}]
+              "interactionLogs": [
+                {"id": 1, "personId": 1, "timestamp": 1000, "type": "CALL"},
+                {"id": 2, "personId": 1, "timestamp": 2000, "type": "MEETING"}
+              ]
             }
         """.trimIndent()
 
@@ -257,6 +311,8 @@ class NetworkDomainTest {
 
         assertEquals(DefaultContactTypes.all.map { it.key }, decoded.contactTypes.map { it.key })
         assertEquals(DefaultContactTypes.CALL, decoded.people.first().preferredContactTypeKey)
+        assertEquals(listOf(DefaultContactTypes.CALL, DefaultContactTypes.MEETING), decoded.rhythms.map { it.contactTypeKey })
+        assertEquals(2000L, decoded.rhythms.first { it.contactTypeKey == DefaultContactTypes.MEETING }.lastInteractionDate)
         assertEquals(null, decoded.people.first().customFrequencyDays)
         assertEquals("", decoded.people.first().memoryNotes)
         assertEquals("", decoded.logs.first().note)

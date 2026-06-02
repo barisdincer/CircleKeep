@@ -84,6 +84,32 @@ data class Person(
 )
 
 @Entity(
+    tableName = "person_contact_rhythms",
+    primaryKeys = ["personId", "contactTypeKey"],
+    foreignKeys = [
+        ForeignKey(
+            entity = Person::class,
+            parentColumns = ["id"],
+            childColumns = ["personId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("personId"),
+        Index("contactTypeKey")
+    ]
+)
+data class PersonContactRhythm(
+    val personId: Int,
+    val contactTypeKey: String,
+    @ColumnInfo(defaultValue = "1")
+    val isActive: Boolean = true,
+    val customFrequencyDays: Int? = null,
+    val lastInteractionDate: Long? = null,
+    val snoozedUntilDate: Long? = null
+)
+
+@Entity(
     tableName = "interaction_logs",
     foreignKeys = [
         ForeignKey(

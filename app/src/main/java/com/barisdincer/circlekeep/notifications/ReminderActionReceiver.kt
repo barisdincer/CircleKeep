@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.barisdincer.circlekeep.NetworkApplication
+import com.barisdincer.circlekeep.data.DefaultContactTypes
 import java.util.Calendar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,8 @@ import kotlinx.coroutines.launch
 class ReminderActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val personId = intent.getIntExtra(ReminderActions.EXTRA_PERSON_ID, -1)
+        val contactTypeKey = intent.getStringExtra(ReminderActions.EXTRA_CONTACT_TYPE_KEY)
+            ?: DefaultContactTypes.CALL
         if (personId <= 0) return
 
         val pendingResult = goAsync()
@@ -22,10 +25,10 @@ class ReminderActionReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as NetworkApplication
                 when (intent.action) {
                     ReminderActions.ACTION_LOG_CALL -> {
-                        app.repository.logPreferredInteraction(personId)
+                        app.repository.logInteraction(personId, contactTypeKey)
                     }
                     ReminderActions.ACTION_SNOOZE_TOMORROW -> {
-                        app.repository.snoozePerson(personId, tomorrowAtNine())
+                        app.repository.snoozePersonContactType(personId, contactTypeKey, tomorrowAtNine())
                     }
                 }
 

@@ -8,6 +8,7 @@ class NetworkRepository(private val networkDao: NetworkDao) {
     val activeContactTypes: Flow<List<ContactType>> = networkDao.getActiveContactTypes()
     val allWaves: Flow<List<Wave>> = networkDao.getAllWaves()
     val allPeople: Flow<List<Person>> = networkDao.getAllPeople()
+    val allPersonContactRhythms: Flow<List<PersonContactRhythm>> = networkDao.getAllPersonContactRhythms()
     val allInteractions: Flow<List<InteractionLog>> = networkDao.getAllInteractionLogs()
     val recentInteractions: Flow<List<InteractionLog>> = networkDao.getRecentInteractions()
 
@@ -49,8 +50,9 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         val type = networkDao.getContactTypeByKey(key)
             ?: return RepositoryActionResult(false, "İletişim türü bulunamadı.")
         val peopleCount = networkDao.countPeopleWithPreferredContactType(key)
+        val rhythmCount = networkDao.countPersonContactRhythmsByType(key)
         val logCount = networkDao.countInteractionLogsByType(key)
-        if (peopleCount > 0 || logCount > 0) {
+        if (peopleCount > 0 || rhythmCount > 0 || logCount > 0) {
             return RepositoryActionResult(
                 success = false,
                 message = "Bu tür kişi tercihlerinde veya geçmişte kullanılıyor; önce kullanımı kaldırmalısın."
@@ -60,6 +62,7 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         if (type.isDefault) {
             networkDao.setContactTypeActive(key, false)
         } else {
+            networkDao.deleteInactivePersonContactRhythmsByType(key)
             networkDao.deleteContactTypeByKey(key)
         }
         return RepositoryActionResult(true, "${type.label} kaldırıldı.")
@@ -105,7 +108,11 @@ class NetworkRepository(private val networkDao: NetworkDao) {
     }
 
     suspend fun insertPerson(person: Person): Long {
-        return networkDao.insertPerson(person.withNormalizedPhone())
+        val id = networkDao.insertPerson(person.withNormalizedPhone()).toInt()
+        if (id > 0) {
+            networkDao.insertPersonContactRhythmIfMissing(id, person.preferredContactTypeKey)
+        }
+        return id.toLong()
     }
 
     suspend fun insertPerson(
@@ -137,6 +144,10 @@ class NetworkRepository(private val networkDao: NetworkDao) {
 
     suspend fun updatePerson(person: Person) {
         networkDao.updatePerson(person.withNormalizedPhone())
+        if (person.id > 0) {
+            networkDao.insertPersonContactRhythmIfMissing(person.id, person.preferredContactTypeKey)
+            networkDao.updatePersonContactRhythmsCustomFrequency(person.id, person.customFrequencyDays?.takeIf { it > 0 })
+        }
     }
 
     suspend fun deletePerson(id: Int): RepositoryActionResult {
@@ -157,6 +168,27 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         }
         networkDao.updatePeopleWave(distinctIds, waveId)
         return RepositoryActionResult(true, "${distinctIds.size} kişi gruba eklendi.")
+    }
+
+    suspend fun setPersonContactRhythmActive(
+        personId: Int,
+        contactTypeKey: String,
+        isActive: Boolean
+    ): RepositoryActionResult {
+        val person = networkDao.getPersonById(personId)
+            ?: return RepositoryActionResult(false, "Kişi bulunamadı.")
+        if (contactTypeKey.isBlank()) {
+            return RepositoryActionResult(false, "İletişim türü bulunamadı.")
+        }
+        networkDao.insertPersonContactRhythmIfMissing(personId, contactTypeKey)
+        networkDao.updatePersonContactRhythmActive(personId, contactTypeKey, isActive)
+        if (isActive) {
+            networkDao.updatePreferredContactType(personId, contactTypeKey)
+        }
+        return RepositoryActionResult(
+            success = true,
+            message = if (isActive) "İletişim türü takibe alındı." else "İletişim türü takipten çıkarıldı."
+        )
     }
 
     suspend fun logInteraction(
@@ -188,6 +220,9 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         val updated = log.copy(note = log.note.trim())
         networkDao.updateInteractionLog(updated)
         refreshLastInteraction(existing.personId)
+        refreshPersonContactRhythm(existing.personId, existing.type)
+        refreshPersonContactRhythm(updated.personId, updated.type)
+        networkDao.updatePersonContactRhythmActive(updated.personId, updated.type, true)
         if (existing.personId != updated.personId) {
             refreshLastInteraction(updated.personId)
         }
@@ -199,6 +234,7 @@ class NetworkRepository(private val networkDao: NetworkDao) {
             ?: return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
         networkDao.deleteInteractionLogById(id)
         refreshLastInteraction(existing.personId)
+        refreshPersonContactRhythm(existing.personId, existing.type)
         return RepositoryActionResult(true, "Temas kaydı silindi.")
     }
 
@@ -209,6 +245,11 @@ class NetworkRepository(private val networkDao: NetworkDao) {
 
     suspend fun snoozePerson(personId: Int, untilDate: Long) {
         networkDao.updateSnoozedUntil(personId, untilDate)
+    }
+
+    suspend fun snoozePersonContactType(personId: Int, type: String, untilDate: Long) {
+        networkDao.insertPersonContactRhythmIfMissing(personId, type)
+        networkDao.updatePersonContactRhythmSnooze(personId, type, untilDate)
     }
 
     suspend fun logCallInteraction(person: Person, timestamp: Long) {
@@ -235,18 +276,29 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         return networkDao.getInteractionSnapshot()
     }
 
+    suspend fun getPersonContactRhythmSnapshot(): List<PersonContactRhythm> {
+        return networkDao.getPersonContactRhythmSnapshot()
+    }
+
     suspend fun replaceAllData(
         contactTypes: List<ContactType>,
         waves: List<Wave>,
         people: List<Person>,
+        rhythms: List<PersonContactRhythm>,
         logs: List<InteractionLog>
     ) {
         networkDao.replaceAllData(
             contactTypes = contactTypes.ifEmpty { DefaultContactTypes.all },
             waves = waves,
             people = people.map { it.withNormalizedPhone() },
+            rhythms = rhythms,
             logs = logs
         )
+        if (rhythms.isEmpty()) {
+            networkDao.getPeopleSnapshot().forEach { person ->
+                networkDao.insertPersonContactRhythmIfMissing(person.id, person.preferredContactTypeKey)
+            }
+        }
     }
 
     fun getLogsForPerson(personId: Int): Flow<List<InteractionLog>> {
@@ -257,6 +309,14 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         val fallback = networkDao.getPersonById(personId)?.addedDate ?: return
         val latest = networkDao.getLatestInteractionTimestampForPerson(personId) ?: fallback
         networkDao.updateLastInteraction(personId, latest)
+    }
+
+    private suspend fun refreshPersonContactRhythm(personId: Int, type: String) {
+        val person = networkDao.getPersonById(personId) ?: return
+        networkDao.insertPersonContactRhythmIfMissing(personId, type)
+        val latest = networkDao.getLatestInteractionTimestampForPersonAndType(personId, type)
+            ?: person.addedDate
+        networkDao.updatePersonContactRhythmLastInteraction(personId, type, latest)
     }
 
     private fun Person.withNormalizedPhone(): Person {

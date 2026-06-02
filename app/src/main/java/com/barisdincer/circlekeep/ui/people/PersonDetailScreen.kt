@@ -32,7 +32,7 @@ import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PersonDetailScreen(
     personId: Int,
@@ -46,8 +46,15 @@ fun PersonDetailScreen(
     val interactions by viewModel.allInteractions.collectAsState()
     val contactTypes by viewModel.contactTypes.collectAsState()
     val activeContactTypes by viewModel.activeContactTypes.collectAsState()
+    val contactRhythms by viewModel.personContactRhythms.collectAsState()
     val uiMessage by viewModel.uiMessage.collectAsState()
     val personInteractions = interactions.filter { it.personId == personId }.sortedByDescending { it.timestamp }
+    val personRhythms = contactRhythms.filter { it.personId == personId }
+    val selectedContactTypeKeys = if (personRhythms.isEmpty()) {
+        setOf(person?.preferredContactTypeKey ?: DefaultContactTypes.CALL)
+    } else {
+        personRhythms.filter { it.isActive }.map { it.contactTypeKey }.toSet()
+    }
 
     var editName by remember { mutableStateOf(person?.name.orEmpty()) }
     var editPhone by remember { mutableStateOf(person?.phoneNumber.orEmpty()) }
@@ -257,7 +264,7 @@ fun PersonDetailScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("Hatırlatma ritmi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                "Bu kişinin hangi tür temasla ve kaç günde bir hatırlatılacağını ayarla.",
+                                "Bu kişinin hangi temas türleriyle ve kaç günde bir hatırlatılacağını ayarla.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -290,7 +297,7 @@ fun PersonDetailScreen(
                                 value = currentType?.label ?: "Arama",
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Tercih edilen temas") },
+                                label = { Text("Birincil hızlı aksiyon") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                                 modifier = Modifier.menuAnchor().fillMaxWidth()
                             )
@@ -308,6 +315,26 @@ fun PersonDetailScreen(
                                     )
                                 }
                             }
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Takip edilen türler", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                activeContactTypes.forEach { type ->
+                                    val selected = type.key in selectedContactTypeKeys
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = {
+                                            viewModel.setPersonContactRhythmActive(person.id, type.key, !selected)
+                                        },
+                                        label = { Text(type.label) }
+                                    )
+                                }
+                            }
+                            Text(
+                                "Bir kişide birden fazla tür seçilirse Bugün ekranında her tür kendi son temasına göre ayrı görünür.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         OutlinedTextField(
                             value = editCustomFrequency,

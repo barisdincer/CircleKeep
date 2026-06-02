@@ -4,12 +4,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object NetworkBackupCodec {
-    private const val VERSION = 2
+    private const val VERSION = 3
 
     fun encode(
         contactTypes: List<ContactType>,
         waves: List<Wave>,
         people: List<Person>,
+        rhythms: List<PersonContactRhythm> = emptyList(),
         logs: List<InteractionLog>
     ): String {
         return JSONObject()
@@ -18,6 +19,7 @@ object NetworkBackupCodec {
             .put("contactTypes", JSONArray(contactTypes.map { it.toJson() }))
             .put("waves", JSONArray(waves.map { it.toJson() }))
             .put("people", JSONArray(people.map { it.toJson() }))
+            .put("personContactRhythms", JSONArray(rhythms.map { it.toJson() }))
             .put("interactionLogs", JSONArray(logs.map { it.toJson() }))
             .toString(2)
     }
@@ -27,9 +29,11 @@ object NetworkBackupCodec {
         val contactTypes = root.optJSONArray("contactTypes")?.mapObjects { it.toContactType() }
             ?: DefaultContactTypes.all
         val waves = root.getJSONArray("waves").mapObjects { it.toWave() }
-        val people = root.getJSONArray("people").mapObjects { it.toPerson() }
         val logs = root.getJSONArray("interactionLogs").mapObjects { it.toInteractionLog() }
-        return NetworkBackup(contactTypes = contactTypes, waves = waves, people = people, logs = logs)
+        val people = root.getJSONArray("people").mapObjects { it.toPerson() }
+        val rhythms = root.optJSONArray("personContactRhythms")?.mapObjects { it.toPersonContactRhythm() }
+            ?: fallbackRhythmsFromLegacyBackup(people, logs)
+        return NetworkBackup(contactTypes = contactTypes, waves = waves, people = people, rhythms = rhythms, logs = logs)
     }
 
     private fun ContactType.toJson(): JSONObject {
@@ -68,6 +72,16 @@ object NetworkBackupCodec {
             .put("addedDate", addedDate)
             .put("lastInteractionDate", lastInteractionDate)
             .putNullable("lastCallLogSyncDate", lastCallLogSyncDate)
+            .putNullable("snoozedUntilDate", snoozedUntilDate)
+    }
+
+    private fun PersonContactRhythm.toJson(): JSONObject {
+        return JSONObject()
+            .put("personId", personId)
+            .put("contactTypeKey", contactTypeKey)
+            .put("isActive", isActive)
+            .putNullable("customFrequencyDays", customFrequencyDays)
+            .putNullable("lastInteractionDate", lastInteractionDate)
             .putNullable("snoozedUntilDate", snoozedUntilDate)
     }
 
@@ -124,6 +138,17 @@ object NetworkBackupCodec {
         )
     }
 
+    private fun JSONObject.toPersonContactRhythm(): PersonContactRhythm {
+        return PersonContactRhythm(
+            personId = getInt("personId"),
+            contactTypeKey = getString("contactTypeKey"),
+            isActive = optBoolean("isActive", true),
+            customFrequencyDays = optNullableInt("customFrequencyDays"),
+            lastInteractionDate = optNullableLong("lastInteractionDate"),
+            snoozedUntilDate = optNullableLong("snoozedUntilDate")
+        )
+    }
+
     private fun JSONObject.toInteractionLog(): InteractionLog {
         return InteractionLog(
             id = getInt("id"),
@@ -132,6 +157,39 @@ object NetworkBackupCodec {
             type = getString("type"),
             note = optString("note")
         )
+    }
+
+    private fun fallbackRhythmsFromLegacyBackup(
+        people: List<Person>,
+        logs: List<InteractionLog>
+    ): List<PersonContactRhythm> {
+        val peopleById = people.associateBy { it.id }
+        val rhythmsByKey = linkedMapOf<Pair<Int, String>, PersonContactRhythm>()
+
+        people.forEach { person ->
+            rhythmsByKey[person.id to person.preferredContactTypeKey] = PersonContactRhythm(
+                personId = person.id,
+                contactTypeKey = person.preferredContactTypeKey,
+                isActive = true,
+                customFrequencyDays = person.customFrequencyDays,
+                lastInteractionDate = person.lastInteractionDate,
+                snoozedUntilDate = person.snoozedUntilDate
+            )
+        }
+
+        logs.groupBy { it.personId to it.type }.forEach { (key, typedLogs) ->
+            val person = peopleById[key.first] ?: return@forEach
+            rhythmsByKey[key] = PersonContactRhythm(
+                personId = key.first,
+                contactTypeKey = key.second,
+                isActive = true,
+                customFrequencyDays = if (key.second == person.preferredContactTypeKey) person.customFrequencyDays else null,
+                lastInteractionDate = typedLogs.maxOfOrNull { it.timestamp },
+                snoozedUntilDate = if (key.second == person.preferredContactTypeKey) person.snoozedUntilDate else null
+            )
+        }
+
+        return rhythmsByKey.values.toList()
     }
 
     private fun <T> JSONArray.mapObjects(mapper: (JSONObject) -> T): List<T> {
@@ -159,5 +217,6 @@ data class NetworkBackup(
     val contactTypes: List<ContactType>,
     val waves: List<Wave>,
     val people: List<Person>,
+    val rhythms: List<PersonContactRhythm>,
     val logs: List<InteractionLog>
 )

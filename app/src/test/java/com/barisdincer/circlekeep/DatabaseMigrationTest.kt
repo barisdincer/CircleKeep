@@ -23,7 +23,7 @@ class DatabaseMigrationTest {
     fun `migrates version 1 database to current schema without losing people`() {
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()
-            val dbName = "migration-v1-to-v5-test.db"
+            val dbName = "migration-v1-to-v6-test.db"
             context.deleteDatabase(dbName)
             createVersion1Database(context, dbName)
 
@@ -32,6 +32,7 @@ class DatabaseMigrationTest {
             try {
                 val people = database.networkDao().getPeopleSnapshot()
                 val logs = database.networkDao().getInteractionSnapshot()
+                val rhythms = database.networkDao().getPersonContactRhythmSnapshot()
 
                 assertEquals(1, people.size)
                 assertEquals("Ayse", people.first().name)
@@ -50,6 +51,8 @@ class DatabaseMigrationTest {
                 assertEquals(0L, people.first().lastInteractionDate)
                 assertNull(people.first().snoozedUntilDate)
                 assertEquals(0, logs.size)
+                assertEquals(listOf("CALL"), rhythms.map { it.contactTypeKey })
+                assertEquals(listOf(1), rhythms.map { it.personId })
                 assertEquals(listOf("CALL", "MESSAGE", "MEETING"), database.networkDao().getContactTypeSnapshot().map { it.key })
                 assertNotNull(database.openHelper.readableDatabase)
             } finally {
@@ -63,7 +66,7 @@ class DatabaseMigrationTest {
     fun `migrates version 2 database to current schema without losing people`() {
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()
-            val dbName = "migration-v2-to-v5-test.db"
+            val dbName = "migration-v2-to-v6-test.db"
             context.deleteDatabase(dbName)
             createVersion2Database(context, dbName)
 
@@ -72,6 +75,7 @@ class DatabaseMigrationTest {
             try {
                 val people = database.networkDao().getPeopleSnapshot()
                 val logs = database.networkDao().getInteractionSnapshot()
+                val rhythms = database.networkDao().getPersonContactRhythmSnapshot()
 
                 assertEquals(1, people.size)
                 assertEquals("Ayse", people.first().name)
@@ -83,6 +87,8 @@ class DatabaseMigrationTest {
                 assertEquals(1, logs.size)
                 assertEquals(1, logs.first().id)
                 assertEquals("", logs.first().note)
+                assertEquals(listOf("CALL"), rhythms.map { it.contactTypeKey })
+                assertEquals(2000L, rhythms.first().lastInteractionDate)
                 assertNotNull(database.openHelper.readableDatabase)
             } finally {
                 database.close()
@@ -92,10 +98,10 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun `migrates version 4 database to current schema with contact types and memory defaults`() {
+    fun `migrates version 4 database to current schema with contact types rhythms and memory defaults`() {
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()
-            val dbName = "migration-v4-to-v5-test.db"
+            val dbName = "migration-v4-to-v6-test.db"
             context.deleteDatabase(dbName)
             createVersion4Database(context, dbName)
 
@@ -105,6 +111,7 @@ class DatabaseMigrationTest {
                 val people = database.networkDao().getPeopleSnapshot()
                 val logs = database.networkDao().getInteractionSnapshot()
                 val contactTypes = database.networkDao().getContactTypeSnapshot()
+                val rhythms = database.networkDao().getPersonContactRhythmSnapshot()
 
                 assertEquals(1, people.size)
                 assertEquals("CALL", people.first().preferredContactTypeKey)
@@ -116,6 +123,8 @@ class DatabaseMigrationTest {
                 assertEquals(1, logs.size)
                 assertEquals("MEETING", logs.first().type)
                 assertEquals("", logs.first().note)
+                assertEquals(listOf("CALL", "MEETING"), rhythms.map { it.contactTypeKey }.sorted())
+                assertEquals(2000L, rhythms.first { it.contactTypeKey == "MEETING" }.lastInteractionDate)
                 assertEquals(listOf("CALL", "MESSAGE", "MEETING"), contactTypes.map { it.key })
                 assertTrue(contactTypes.all { it.isActive })
                 assertNotNull(database.openHelper.readableDatabase)
