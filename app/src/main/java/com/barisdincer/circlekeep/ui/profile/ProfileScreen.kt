@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -36,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -142,28 +144,31 @@ fun ProfileScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ProfileAvatar(
                             initials = initials.ifBlank { "CK" },
                             color = avatarColor(avatarColorKey)
                         )
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
                                 displayName.ifBlank { "CircleKeep profili" },
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                "Hesap yok, sunucu yok. Bu bilgiler sadece bu cihazda durur.",
-                                style = MaterialTheme.typography.bodySmall,
+                                "Yerel profil · sunucusuz",
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                        IconButton(onClick = { editingProfile = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Profili düzenle")
                         }
                     }
                     if (editingProfile) {
@@ -219,13 +224,6 @@ fun ProfileScreen(
                                 Text("Kaydet")
                             }
                         }
-                    } else {
-                        OutlinedButton(
-                            onClick = { editingProfile = true },
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Profili düzenle")
-                        }
                     }
                 }
             }
@@ -246,7 +244,7 @@ fun ProfileScreen(
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Temas logları", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            "Geçmiş kayıtları düzenle veya sil.",
+                            "Eklenmiş etkinlikleri ve tekil temas kayıtlarını düzenle veya sil.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -355,14 +353,14 @@ fun ProfileScreen(
 private fun ProfileAvatar(initials: String, color: Color) {
     Box(
         modifier = Modifier
-            .size(72.dp)
+            .size(56.dp)
             .clip(CircleShape)
             .background(color),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = initials.take(3).ifBlank { "CK" },
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Black,
             color = Color.White
         )

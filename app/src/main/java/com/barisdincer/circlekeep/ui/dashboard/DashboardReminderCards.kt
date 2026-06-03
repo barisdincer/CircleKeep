@@ -44,6 +44,7 @@ import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.contactActionLabel
 import com.barisdincer.circlekeep.ui.PersonWithWave
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -152,7 +153,7 @@ internal fun UpcomingSectionPanel(
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Sıradakiler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        nextContact?.let { "${it.person.name} · ${it.statusText()} · ${it.contactType.label}" }
+                        nextContact?.let { "${it.person.name} · ${it.upcomingStatusText()} · ${it.contactType.label}" }
                             ?: "Yaklaşan ritim yok.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -279,7 +280,7 @@ internal fun ReminderCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Ritim: ${contact.effectiveFrequencyDays} gün · ${contact.groupPolicyText()}",
+                    contact.nextDateLine(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -352,8 +353,26 @@ internal fun PersonWithWave.statusText(): String {
     }
 }
 
+private fun PersonWithWave.upcomingStatusText(): String {
+    return when {
+        daysOverdue < 0 -> "${-daysOverdue} gün sonra · ${nextDueDateText()}"
+        else -> statusText()
+    }
+}
+
 internal fun PersonWithWave.scopeText(): String {
     return wave?.name ?: "Kişiye özel"
+}
+
+private fun PersonWithWave.nextDateLine(): String {
+    val prefix = when {
+        snoozedUntilDate != null -> "Erteleme tarihi: ${formatShortDate(snoozedUntilDate)}"
+        daysOverdue < 0 -> "Sıradaki tarih: ${nextDueDateText()}"
+        daysOverdue == 0L && isDue -> "Bugünün ritmi: ${nextDueDateText()}"
+        daysOverdue > 0 -> "Ritim tarihi geçmiş: ${nextDueDateText()}"
+        else -> "Ritim: ${effectiveFrequencyDays} gün"
+    }
+    return "$prefix · ${groupPolicyText()}"
 }
 
 private fun PersonWithWave.groupPolicyText(): String {
@@ -362,6 +381,14 @@ private fun PersonWithWave.groupPolicyText(): String {
     } else {
         "kişiye özel takip"
     }
+}
+
+private fun PersonWithWave.nextDueDateText(): String {
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = lastInteractionDate
+        add(Calendar.DAY_OF_YEAR, effectiveFrequencyDays)
+    }
+    return formatShortDate(calendar.timeInMillis)
 }
 
 internal fun formatShortDate(timestamp: Long): String {
