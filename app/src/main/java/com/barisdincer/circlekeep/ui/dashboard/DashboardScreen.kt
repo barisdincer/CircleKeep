@@ -38,7 +38,8 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    viewModel: NetworkViewModel
+    viewModel: NetworkViewModel,
+    onOpenEventLog: () -> Unit
 ) {
     val dashboard by viewModel.dashboardReminders.collectAsState()
     val people by viewModel.people.collectAsState()
@@ -105,7 +106,7 @@ fun DashboardScreen(
                     syncMessage = syncState.message,
                     isSyncing = syncState.isSyncing,
                     onSync = { viewModel.syncCallLog(context) },
-                    onOpenBatchLog = { logSheet = ContactLogSheetState.Batch }
+                    onOpenBatchLog = onOpenEventLog
                 )
             }
 

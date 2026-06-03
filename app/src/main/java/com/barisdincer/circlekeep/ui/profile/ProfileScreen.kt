@@ -17,12 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
@@ -36,13 +36,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -67,7 +67,6 @@ import com.barisdincer.circlekeep.ui.BackupUiState
 fun ProfileScreen(
     preferences: UserPreferences,
     backupState: BackupUiState,
-    onBack: () -> Unit,
     onLogsClick: () -> Unit,
     onSaveProfile: (String, String, String) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -77,6 +76,7 @@ fun ProfileScreen(
     var displayName by remember { mutableStateOf(preferences.displayName) }
     var initials by remember { mutableStateOf(preferences.displayInitials) }
     var avatarColorKey by remember { mutableStateOf(preferences.avatarColorKey) }
+    var editingProfile by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var pendingBackupJson by remember { mutableStateOf<String?>(null) }
 
@@ -118,11 +118,6 @@ fun ProfileScreen(
             Column {
                 TopAppBar(
                     title = { Text("Profil", fontWeight = FontWeight.SemiBold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                        }
-                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -159,7 +154,11 @@ fun ProfileScreen(
                             color = avatarColor(avatarColorKey)
                         )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Yerel profil", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(
+                                displayName.ifBlank { "CircleKeep profili" },
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
                             Text(
                                 "Hesap yok, sunucu yok. Bu bilgiler sadece bu cihazda durur.",
                                 style = MaterialTheme.typography.bodySmall,
@@ -167,38 +166,66 @@ fun ProfileScreen(
                             )
                         }
                     }
-                    OutlinedTextField(
-                        value = displayName,
-                        onValueChange = { displayName = it },
-                        label = { Text("Adın") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = initials,
-                        onValueChange = { initials = it.uppercase().take(3) },
-                        label = { Text("Avatar harfleri") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        avatarOptions.forEach { option ->
-                            ColorChoice(
-                                label = option.label,
-                                color = option.color,
-                                selected = avatarColorKey == option.key,
-                                onClick = { avatarColorKey = option.key }
-                            )
+                    if (editingProfile) {
+                        OutlinedTextField(
+                            value = displayName,
+                            onValueChange = { displayName = it },
+                            label = { Text("Adın") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = initials,
+                            onValueChange = { initials = it.uppercase().take(3) },
+                            label = { Text("Avatar harfleri") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            avatarOptions.forEach { option ->
+                                ColorChoice(
+                                    label = option.label,
+                                    color = option.color,
+                                    selected = avatarColorKey == option.key,
+                                    onClick = { avatarColorKey = option.key }
+                                )
+                            }
                         }
-                    }
-                    Button(
-                        onClick = { onSaveProfile(displayName, initials, avatarColorKey) },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Kaydet")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    displayName = preferences.displayName
+                                    initials = preferences.displayInitials
+                                    avatarColorKey = preferences.avatarColorKey
+                                    editingProfile = false
+                                }
+                            ) {
+                                Text("Vazgeç")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    onSaveProfile(displayName, initials, avatarColorKey)
+                                    editingProfile = false
+                                }
+                            ) {
+                                Text("Kaydet")
+                            }
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { editingProfile = true },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Profili düzenle")
+                        }
                     }
                 }
             }

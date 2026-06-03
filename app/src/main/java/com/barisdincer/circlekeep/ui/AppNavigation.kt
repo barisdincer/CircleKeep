@@ -44,6 +44,7 @@ import com.barisdincer.circlekeep.NetworkApplication
 import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.preferences.UserPreferencesStore
 import com.barisdincer.circlekeep.ui.dashboard.DashboardScreen
+import com.barisdincer.circlekeep.ui.dashboard.EventLogScreen
 import com.barisdincer.circlekeep.ui.logs.LogsScreen
 import com.barisdincer.circlekeep.ui.people.AddPersonScreen
 import com.barisdincer.circlekeep.ui.people.PeopleScreen
@@ -85,7 +86,20 @@ fun AppNavigation(
         ) {
             composable("dashboard") {
                 DashboardScreen(
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    onOpenEventLog = { navController.navigate("event_log") }
+                )
+            }
+            composable("event_log") {
+                EventLogScreen(
+                    people = viewModel.people.collectAsState().value,
+                    waves = viewModel.waves.collectAsState().value,
+                    contactTypes = viewModel.activeContactTypes.collectAsState().value,
+                    onBack = { navController.popBackStack() },
+                    onSave = { personIds, type, note, timestamp ->
+                        viewModel.logInteractions(personIds, type, note, timestamp)
+                        navController.popBackStack()
+                    }
                 )
             }
             composable("people") {
@@ -148,7 +162,6 @@ fun AppNavigation(
                 ProfileScreen(
                     preferences = userPreferences,
                     backupState = viewModel.backupState.collectAsState().value,
-                    onBack = { navController.popBackStack() },
                     onLogsClick = { navController.navigate("logs") },
                     onSaveProfile = preferencesStore::updateProfile,
                     onThemeModeChange = preferencesStore::updateThemeMode,
@@ -210,7 +223,7 @@ private fun BottomNavigationBar(navController: NavHostController) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             CompactNavItem(
-                selected = currentDestination == "dashboard",
+                selected = currentDestination == "dashboard" || currentDestination == "event_log",
                 label = "Bugün",
                 icon = Icons.Default.Dashboard,
                 modifier = Modifier.weight(1f),

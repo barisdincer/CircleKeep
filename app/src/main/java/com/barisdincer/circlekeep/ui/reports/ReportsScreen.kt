@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,10 +43,7 @@ import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.ReminderDashboardUiState
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 private const val DAY_MILLIS = 24L * 60L * 60L * 1000L
 
@@ -59,13 +57,6 @@ fun ReportsScreen(viewModel: NetworkViewModel) {
     val dashboard by viewModel.dashboardReminders.collectAsState()
 
     val todayStart = todayStartMillis()
-    val last7Days = (6 downTo 0).map { offset ->
-        val dayStart = todayStart - offset * DAY_MILLIS
-        val dayEnd = dayStart + DAY_MILLIS - 1
-        val count = interactions.count { it.timestamp in dayStart..dayEnd }
-        val label = SimpleDateFormat("EE", Locale("tr", "TR")).format(Date(dayStart))
-        DayActivity(label = label, count = count)
-    }
     val last30Start = todayStart - 29 * DAY_MILLIS
     val recentInteractions = interactions.count { it.timestamp >= last30Start }
     val reachedPeople = interactions
@@ -107,7 +98,7 @@ fun ReportsScreen(viewModel: NetworkViewModel) {
 
             RhythmHealthCard(dashboard = dashboard)
 
-            WeeklyActivityCard(days = last7Days)
+            ContactFreshnessCard(people = people)
 
             ContactTypeDistributionCard(
                 interactions = interactions,
@@ -131,6 +122,7 @@ private fun OverviewHeroCard(
     recentInteractions: Int,
     reachedPeople: Int
 ) {
+    val coverage = if (peopleCount == 0) 0f else reachedPeople.toFloat() / peopleCount
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -140,14 +132,22 @@ private fun OverviewHeroCard(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("İlişki ritmi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Son 30 gün içinde $reachedPeople kişiyle $recentInteractions temas.",
+                    "Son 30 günde $reachedPeople kişiye ulaşıldı; toplam $recentInteractions temas kaydı var.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
                 )
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ProgressStrip(
+                label = "30 gün kapsamı",
+                value = reachedPeople,
+                total = peopleCount,
+                progress = coverage,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MetricCard("Kişi", "$peopleCount", Modifier.weight(1f))
-                MetricCard("Temas", "$totalInteractions", Modifier.weight(1f))
+                MetricCard("30 gün", "$recentInteractions", Modifier.weight(1f))
+                MetricCard("Toplam", "$totalInteractions", Modifier.weight(1f))
             }
         }
     }
@@ -156,6 +156,13 @@ private fun OverviewHeroCard(
 @Composable
 private fun RhythmHealthCard(dashboard: ReminderDashboardUiState) {
     val dueCount = dashboard.today.size + dashboard.overdue.size
+    val rows = listOf(
+        StatusMetric("Geciken", dashboard.overdue.size, MaterialTheme.colorScheme.error),
+        StatusMetric("Bugün", dashboard.today.size, MaterialTheme.colorScheme.primary),
+        StatusMetric("Sıradaki", dashboard.upcoming.size, MaterialTheme.colorScheme.tertiary),
+        StatusMetric("Ertelenen", dashboard.snoozed.size, MaterialTheme.colorScheme.outline)
+    )
+    val total = rows.sumOf { it.count }.coerceAtLeast(1)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -163,19 +170,39 @@ private fun RhythmHealthCard(dashboard: ReminderDashboardUiState) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Bugünkü akış", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill("Bekleyen", dueCount, MaterialTheme.colorScheme.primaryContainer, Modifier.weight(1f))
-                StatusPill("Sırada", dashboard.upcoming.size, MaterialTheme.colorScheme.tertiaryContainer, Modifier.weight(1f))
-                StatusPill("Ertelenen", dashboard.snoozed.size, MaterialTheme.colorScheme.surfaceVariant, Modifier.weight(1f))
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Ritim durumu", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "$dueCount bekleyen ritim var. Sıradakiler ve ertelemeler toplam görünüm içinde izlenir.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            SegmentedBar(
+                segments = rows.map { Segment(it.count.toFloat() / total, it.color) }
+            )
+            rows.forEach { row ->
+                DistributionRow(
+                    label = row.label,
+                    count = row.count,
+                    progress = row.count.toFloat() / total,
+                    color = row.color
+                )
             }
         }
     }
 }
 
 @Composable
-private fun WeeklyActivityCard(days: List<DayActivity>) {
-    val maxCount = days.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+private fun ContactFreshnessCard(people: List<Person>) {
+    val now = System.currentTimeMillis()
+    val rows = listOf(
+        FreshnessBucket("Son 14 gün", people.count { daysSince(it.lastInteractionDate, now) <= 14 }, MaterialTheme.colorScheme.primary),
+        FreshnessBucket("15-30 gün", people.count { daysSince(it.lastInteractionDate, now) in 15..30 }, MaterialTheme.colorScheme.tertiary),
+        FreshnessBucket("31-60 gün", people.count { daysSince(it.lastInteractionDate, now) in 31..60 }, MaterialTheme.colorScheme.secondary),
+        FreshnessBucket("60+ gün", people.count { daysSince(it.lastInteractionDate, now) > 60 }, MaterialTheme.colorScheme.error)
+    )
+    val total = people.size.coerceAtLeast(1)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -183,40 +210,24 @@ private fun WeeklyActivityCard(days: List<DayActivity>) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Son 7 gün", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(
-                modifier = Modifier.fillMaxWidth().height(148.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                days.forEach { day ->
-                    val barHeight = (18 + (day.count.toFloat() / maxCount) * 92).dp
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom
-                    ) {
-                        Text(
-                            day.count.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(18.dp)
-                                .height(barHeight)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            day.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Son temas tazeliği", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Kişilerin ne kadar zamandır temas beklediğini daha net gösterir.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            SegmentedBar(
+                segments = rows.map { Segment(it.count.toFloat() / total, it.color) }
+            )
+            rows.forEach { row ->
+                DistributionRow(
+                    label = row.label,
+                    count = row.count,
+                    progress = row.count.toFloat() / total,
+                    color = row.color
+                )
             }
         }
     }
@@ -237,7 +248,14 @@ private fun ContactTypeDistributionCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Temas türleri", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Temas türleri", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Arama, mesaj ve buluşmaların toplam geçmiş içindeki ağırlığı.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (counts.isEmpty()) {
                 Text(
                     "Henüz temas kaydı yok.",
@@ -245,7 +263,13 @@ private fun ContactTypeDistributionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                counts.take(5).forEachIndexed { index, (type, count) ->
+                val visibleCounts = counts.take(5)
+                SegmentedBar(
+                    segments = visibleCounts.mapIndexed { index, (_, count) ->
+                        Segment(count.toFloat() / total, distributionColor(index))
+                    }
+                )
+                visibleCounts.forEachIndexed { index, (type, count) ->
                     DistributionRow(
                         label = interactionTypeLabel(type, contactTypes),
                         count = count,
@@ -278,8 +302,21 @@ private fun GroupCoverageCard(people: List<Person>, waves: List<Wave>) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Grup kapsamı", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            rows.take(6).forEachIndexed { index, (label, count) ->
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Grup kapsamı", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Kişilerin hangi gruplarda yoğunlaştığını gösterir.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            val visibleRows = rows.take(6)
+            SegmentedBar(
+                segments = visibleRows.mapIndexed { index, (_, count) ->
+                    Segment(count.toFloat() / total, distributionColor(index))
+                }
+            )
+            visibleRows.forEachIndexed { index, (label, count) ->
                 DistributionRow(
                     label = label,
                     count = count,
@@ -306,14 +343,68 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun StatusPill(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(8.dp), color = color) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+private fun ProgressStrip(
+    label: String,
+    value: Int,
+    total: Int,
+    progress: Float,
+    color: Color
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(
+                "$value / $total",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
         ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(count.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(color)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SegmentedBar(segments: List<Segment>) {
+    val visibleSegments = segments.filter { it.weight > 0f }
+    if (visibleSegments.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        )
+        return
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(12.dp)
+            .clip(RoundedCornerShape(8.dp)),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        visibleSegments.forEach { segment ->
+            Box(
+                modifier = Modifier
+                    .weight(segment.weight.coerceAtLeast(0.01f))
+                    .fillMaxHeight()
+                    .background(segment.color)
+            )
         }
     }
 }
@@ -323,7 +414,11 @@ private fun DistributionRow(label: String, count: Int, progress: Float, color: C
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(count.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "$count · ${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         Box(
             modifier = Modifier
@@ -345,14 +440,23 @@ private fun DistributionRow(label: String, count: Int, progress: Float, color: C
 
 @Composable
 private fun distributionColor(index: Int): Color {
-    val colors = listOf(
+    val colors = reportColors()
+    return colors[index % colors.size]
+}
+
+@Composable
+private fun reportColors(): List<Color> {
+    return listOf(
         MaterialTheme.colorScheme.primary,
         MaterialTheme.colorScheme.tertiary,
         MaterialTheme.colorScheme.secondary,
         MaterialTheme.colorScheme.error,
         MaterialTheme.colorScheme.outline
     )
-    return colors[index % colors.size]
+}
+
+private fun daysSince(timestamp: Long, now: Long): Long {
+    return ((now - timestamp) / DAY_MILLIS).coerceAtLeast(0L)
 }
 
 private fun todayStartMillis(): Long {
@@ -374,7 +478,19 @@ private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>):
     }
 }
 
-private data class DayActivity(
+private data class Segment(
+    val weight: Float,
+    val color: Color
+)
+
+private data class StatusMetric(
     val label: String,
-    val count: Int
+    val count: Int,
+    val color: Color
+)
+
+private data class FreshnessBucket(
+    val label: String,
+    val count: Int,
+    val color: Color
 )
