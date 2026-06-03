@@ -305,6 +305,24 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
+    fun replaceInteractionEvent(
+        existingLogIds: List<Int>,
+        personIds: List<Int>,
+        type: String,
+        note: String,
+        timestamp: Long
+    ) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.replaceInteractionEvent(
+                existingLogIds = existingLogIds,
+                personIds = personIds,
+                type = type,
+                note = note,
+                timestamp = timestamp
+            ).message
+        }
+    }
+
     fun deleteInteractionLog(id: Int) {
         viewModelScope.launch {
             _uiMessage.value = repository.deleteInteractionLog(id).message

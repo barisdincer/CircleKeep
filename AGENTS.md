@@ -191,6 +191,16 @@ Actions is the primary verification and APK production path.
 
 - Prefer pushing changes to GitHub and using GitHub Actions for
   `testDebugUnitTest`, `assembleDebug`, and release APK generation.
+- GitHub Releases must publish the signed release APK from `assembleRelease`,
+  not a debug APK. The release workflow expects signing material in GitHub
+  Secrets: `CIRCLEKEEP_RELEASE_KEYSTORE_BASE64`,
+  `CIRCLEKEEP_RELEASE_STORE_PASSWORD`, `CIRCLEKEEP_RELEASE_KEY_ALIAS`, and
+  `CIRCLEKEEP_RELEASE_KEY_PASSWORD`.
+- Never commit release keystores, keystore passwords, decoded base64 files, or
+  signing backup notes. Keep signing material outside git and restore it through
+  GitHub Secrets when a runner needs to produce a release.
+- The checked-in `debug.keystore` is only for update-compatible debug builds and
+  must not be used for public release artifacts.
 - Treat local Gradle builds on the Pi as a fallback path, not the default.
 - Use the local fallback only when GitHub Actions is unavailable, rate-limited,
   broken for infrastructure reasons, or when a very small local check is clearly

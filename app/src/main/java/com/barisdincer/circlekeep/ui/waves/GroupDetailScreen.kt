@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -246,10 +248,11 @@ fun GroupDetailScreen(
         editingEvent?.let { event ->
             EditGroupEventSheet(
                 group = event,
+                people = groupPeople,
                 contactTypes = contactTypes,
                 onDismiss = { editingEvent = null },
-                onSave = { updatedLogs ->
-                    viewModel.updateInteractionLogs(updatedLogs)
+                onSave = { personIds, type, note, timestamp ->
+                    viewModel.replaceInteractionEvent(event.ids, personIds, type, note, timestamp)
                     editingEvent = null
                 }
             )
@@ -500,7 +503,12 @@ private fun GroupContactLogSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
         Column(
-            modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 640.dp)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Etkinlik ekle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

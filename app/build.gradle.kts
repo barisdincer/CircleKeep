@@ -5,6 +5,17 @@ plugins {
   alias(libs.plugins.roborazzi)
 }
 
+val releaseStoreFile = providers.environmentVariable("CIRCLEKEEP_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("CIRCLEKEEP_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("CIRCLEKEEP_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("CIRCLEKEEP_RELEASE_KEY_PASSWORD").orNull
+val hasReleaseSigning = listOf(
+  releaseStoreFile,
+  releaseStorePassword,
+  releaseKeyAlias,
+  releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
   namespace = "com.barisdincer.circlekeep"
   compileSdk = 36
@@ -15,8 +26,8 @@ android {
     applicationId = "com.barisdincer.networkmanager"
     minSdk = 24
     targetSdk = 36
-    versionCode = 11
-    versionName = "1.0.11"
+    versionCode = 12
+    versionName = "1.0.12"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -28,6 +39,14 @@ android {
       keyAlias = "androiddebugkey"
       keyPassword = "android"
     }
+    create("circleKeepRelease") {
+      if (hasReleaseSigning) {
+        storeFile = rootProject.file(releaseStoreFile!!)
+        storePassword = releaseStorePassword!!
+        keyAlias = releaseKeyAlias!!
+        keyPassword = releaseKeyPassword!!
+      }
+    }
   }
 
   buildTypes {
@@ -37,6 +56,9 @@ android {
     release {
       isCrunchPngs = false
       isMinifyEnabled = false
+      if (hasReleaseSigning) {
+        signingConfig = signingConfigs.getByName("circleKeepRelease")
+      }
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }

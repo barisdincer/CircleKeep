@@ -41,11 +41,44 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Decode release signing key
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.CIRCLEKEEP_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.CIRCLEKEEP_RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.CIRCLEKEEP_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.CIRCLEKEEP_RELEASE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          missing=0
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub secret: ${name/RELEASE_/CIRCLEKEEP_RELEASE_}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/circlekeep-signing"
+          KEYSTORE_PATH="$RUNNER_TEMP/circlekeep-signing/circlekeep-release.jks"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+
+          {
+            echo "CIRCLEKEEP_RELEASE_STORE_FILE=$KEYSTORE_PATH"
+            echo "CIRCLEKEEP_RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
+            echo "CIRCLEKEEP_RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+            echo "CIRCLEKEEP_RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: Test
         run: ./gradlew testDebugUnitTest
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build signed release APK
+        run: ./gradlew assembleRelease
+
+      - name: Verify release APK signature
+        run: $ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare release files
         id: release_files
@@ -55,8 +88,8 @@ jobs:
           PRERELEASE="${{ github.event.inputs.prerelease }}"
 
           mkdir -p release
-          APK_PATH="release/CircleKeep-${TAG_NAME}-debug.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "$APK_PATH"
+          APK_PATH="release/CircleKeep-${TAG_NAME}-release.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK_PATH"
           sha256sum "$APK_PATH" > "${APK_PATH}.sha256"
 
           {
@@ -83,7 +116,7 @@ jobs:
       - name: Create release notes
         shell: bash
         run: |
-          printf 'CircleKeep APK built from commit %s.\n\nThis is a debug APK intended for direct device testing.\n' "$GITHUB_SHA" > release-notes.md
+          printf 'CircleKeep APK built from commit %s.\n\nThis is a release APK signed with the CircleKeep release key.\n' "$GITHUB_SHA" > release-notes.md
 
       - name: Publish GitHub release
         env:

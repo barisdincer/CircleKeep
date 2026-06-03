@@ -263,6 +263,36 @@ class NetworkRepositoryTest {
     }
 
     @Test
+    fun `replacing grouped event participants adds and removes people`() = runBlocking {
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
+        repository.insertPerson(Person(id = 2, name = "Mehmet", phoneNumber = "5322222222", waveId = null, addedDate = 20L, lastInteractionDate = 20L))
+        repository.insertPerson(Person(id = 3, name = "Zeynep", phoneNumber = "5323333333", waveId = null, addedDate = 30L, lastInteractionDate = 30L))
+        repository.logInteractions(
+            personIds = listOf(1, 2),
+            type = DefaultContactTypes.MEETING,
+            note = "Eski not",
+            timestamp = 100L
+        )
+        val originalIds = repository.getInteractionSnapshot().map { it.id }
+
+        val result = repository.replaceInteractionEvent(
+            existingLogIds = originalIds,
+            personIds = listOf(2, 3),
+            type = DefaultContactTypes.MESSAGE,
+            note = "Yeni plan",
+            timestamp = 400L
+        )
+
+        val people = repository.getPeopleSnapshot().sortedBy { it.id }
+        val logs = repository.getInteractionSnapshot().sortedBy { it.personId }
+        assertTrue(result.success)
+        assertEquals(listOf(10L, 400L, 400L), people.map { it.lastInteractionDate })
+        assertEquals(listOf(2, 3), logs.map { it.personId })
+        assertEquals(listOf(DefaultContactTypes.MESSAGE, DefaultContactTypes.MESSAGE), logs.map { it.type })
+        assertEquals(listOf("Yeni plan", "Yeni plan"), logs.map { it.note })
+    }
+
+    @Test
     fun `deleting latest log falls back to previous log or added date`() = runBlocking {
         repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
         repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 100L)

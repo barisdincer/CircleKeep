@@ -18,6 +18,7 @@
 *.keystore
 !debug.keystore
 *.keystore.base64
+.signing-backup/
 google-services.json
 secrets.properties
 .externalNativeBuild

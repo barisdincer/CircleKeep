@@ -2,14 +2,19 @@ package com.barisdincer.circlekeep.ui.waves
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -20,6 +25,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,8 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
-import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.Person
+import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
 import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.text.SimpleDateFormat
@@ -98,33 +104,65 @@ internal fun GroupEventCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun EditGroupEventSheet(
     group: InteractionEventGroup,
+    people: List<Person>,
     contactTypes: List<ContactType>,
     onDismiss: () -> Unit,
-    onSave: (List<InteractionLog>) -> Unit
+    onSave: (List<Int>, String, String, Long) -> Unit
 ) {
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
     var selectedTypeKey by remember(group.ids, typeOptions) { mutableStateOf(group.type) }
     var timestamp by remember(group.ids) { mutableStateOf(group.timestamp) }
     var note by remember(group.ids) { mutableStateOf(group.note) }
+    var selectedPersonIds by remember(group.ids) { mutableStateOf(group.personIds.toSet()) }
     var typeExpanded by remember { mutableStateOf(false) }
     val selectedType = typeOptions.find { it.key == selectedTypeKey }
         ?: DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL }
+    val selectablePeople = remember(people) { people.sortedByTurkish { it.name } }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
         Column(
-            modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 620.dp)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Etkinliği düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "${group.participantCount} kişinin temas kaydı birlikte güncellenir.",
+                "Katılımcılar, tarih, tür ve not birlikte güncellenir.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "${selectedPersonIds.size} kişi seçili",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    selectablePeople.forEach { person ->
+                        val selected = person.id in selectedPersonIds
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                selectedPersonIds = if (selected) {
+                                    selectedPersonIds - person.id
+                                } else {
+                                    selectedPersonIds + person.id
+                                }
+                            },
+                            label = { Text(person.name) }
+                        )
+                    }
+                }
+            }
 
             ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = !typeExpanded }) {
                 OutlinedTextField(
@@ -171,8 +209,9 @@ internal fun EditGroupEventSheet(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = {
-                        onSave(group.logs.map { it.copy(type = selectedTypeKey, timestamp = timestamp, note = note) })
+                        onSave(selectedPersonIds.toList(), selectedTypeKey, note, timestamp)
                     },
+                    enabled = selectedPersonIds.isNotEmpty(),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Kaydet")
