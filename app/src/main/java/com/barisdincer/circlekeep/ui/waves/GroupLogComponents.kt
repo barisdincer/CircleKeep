@@ -41,19 +41,26 @@ import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
+import com.barisdincer.circlekeep.data.Person
+import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
 import com.barisdincer.circlekeep.ui.components.DatePickerField
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-internal fun GroupNoteCard(
-    log: InteractionLog,
-    personName: String,
+internal fun GroupEventCard(
+    group: InteractionEventGroup,
+    people: List<Person>,
     contactTypes: List<ContactType>,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val participantNames = group.personIds
+        .mapNotNull { id -> people.find { it.id == id }?.name }
+        .joinToString(", ")
+        .ifBlank { "Silinmiş kişiler" }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -66,21 +73,26 @@ internal fun GroupNoteCard(
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "$personName · ${interactionTypeLabel(log.type, contactTypes)} · ${formatShortDate(log.timestamp)}",
+                    "${interactionTypeLabel(group.type, contactTypes)} · ${formatShortDate(group.timestamp)} · ${group.participantCount} kişi",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    log.note.ifBlank { "Not eklenmemiş." },
+                    participantNames,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (log.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    group.note.ifBlank { "Not eklenmemiş." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (group.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Temas kaydını düzenle")
+                Icon(Icons.Default.Edit, contentDescription = "Etkinliği düzenle")
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Temas kaydını sil", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = "Etkinliği sil", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -88,16 +100,16 @@ internal fun GroupNoteCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun EditGroupLogSheet(
-    log: InteractionLog,
+internal fun EditGroupEventSheet(
+    group: InteractionEventGroup,
     contactTypes: List<ContactType>,
     onDismiss: () -> Unit,
-    onSave: (InteractionLog) -> Unit
+    onSave: (List<InteractionLog>) -> Unit
 ) {
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
-    var selectedTypeKey by remember(log.id, typeOptions) { mutableStateOf(log.type) }
-    var timestamp by remember(log.id) { mutableStateOf(log.timestamp) }
-    var note by remember(log.id) { mutableStateOf(log.note) }
+    var selectedTypeKey by remember(group.ids, typeOptions) { mutableStateOf(group.type) }
+    var timestamp by remember(group.ids) { mutableStateOf(group.timestamp) }
+    var note by remember(group.ids) { mutableStateOf(group.note) }
     var typeExpanded by remember { mutableStateOf(false) }
     val selectedType = typeOptions.find { it.key == selectedTypeKey }
         ?: DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL }
@@ -107,7 +119,12 @@ internal fun EditGroupLogSheet(
             modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Temas kaydını düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Etkinliği düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "${group.participantCount} kişinin temas kaydı birlikte güncellenir.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = !typeExpanded }) {
                 OutlinedTextField(
@@ -153,7 +170,9 @@ internal fun EditGroupLogSheet(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = { onSave(log.copy(type = selectedTypeKey, timestamp = timestamp, note = note)) },
+                    onClick = {
+                        onSave(group.logs.map { it.copy(type = selectedTypeKey, timestamp = timestamp, note = note) })
+                    },
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Kaydet")
@@ -166,8 +185,8 @@ internal fun EditGroupLogSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DeleteGroupLogSheet(
-    log: InteractionLog,
+internal fun DeleteGroupEventSheet(
+    group: InteractionEventGroup,
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -176,9 +195,9 @@ internal fun DeleteGroupLogSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Temas kaydı silinsin mi?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Etkinlik silinsin mi?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "${formatShortDate(log.timestamp)} tarihli kayıt silinir; ilgili kişi ve temas türü ritmi yeniden hesaplanır.",
+                "${formatShortDate(group.timestamp)} tarihli ${group.participantCount} kişilik etkinlik silinir; ilgili kişi ritimleri yeniden hesaplanır.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -229,6 +229,40 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         return RepositoryActionResult(true, "Temas kaydı güncellendi.")
     }
 
+    suspend fun updateInteractionLogs(logs: List<InteractionLog>): RepositoryActionResult {
+        val ids = logs.map { it.id }.filter { it > 0 }.distinct()
+        if (ids.isEmpty()) {
+            return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
+        }
+        val existingLogs = networkDao.getInteractionLogsByIds(ids)
+        if (existingLogs.isEmpty()) {
+            return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
+        }
+        val existingById = existingLogs.associateBy { it.id }
+        val updatedLogs = logs
+            .filter { it.id in existingById }
+            .map { it.copy(note = it.note.trim()) }
+
+        networkDao.updateInteractionLogs(updatedLogs)
+
+        val affectedPeople = (existingLogs + updatedLogs).map { it.personId }.distinct()
+        val affectedRhythms = (existingLogs + updatedLogs)
+            .map { it.personId to it.type }
+            .distinct()
+        affectedPeople.forEach { refreshLastInteraction(it) }
+        affectedRhythms.forEach { (personId, type) ->
+            refreshPersonContactRhythm(personId, type)
+        }
+        updatedLogs
+            .map { it.personId to it.type }
+            .distinct()
+            .forEach { (personId, type) ->
+                networkDao.updatePersonContactRhythmActive(personId, type, true)
+            }
+
+        return RepositoryActionResult(true, "${updatedLogs.size} temas kaydı güncellendi.")
+    }
+
     suspend fun deleteInteractionLog(id: Int): RepositoryActionResult {
         val existing = networkDao.getInteractionLogById(id)
             ?: return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
@@ -236,6 +270,25 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         refreshLastInteraction(existing.personId)
         refreshPersonContactRhythm(existing.personId, existing.type)
         return RepositoryActionResult(true, "Temas kaydı silindi.")
+    }
+
+    suspend fun deleteInteractionLogs(ids: List<Int>): RepositoryActionResult {
+        val distinctIds = ids.filter { it > 0 }.distinct()
+        if (distinctIds.isEmpty()) {
+            return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
+        }
+        val existingLogs = networkDao.getInteractionLogsByIds(distinctIds)
+        if (existingLogs.isEmpty()) {
+            return RepositoryActionResult(false, "Temas kaydı bulunamadı.")
+        }
+
+        networkDao.deleteInteractionLogsByIds(distinctIds)
+
+        existingLogs.map { it.personId }.distinct().forEach { refreshLastInteraction(it) }
+        existingLogs.map { it.personId to it.type }.distinct().forEach { (personId, type) ->
+            refreshPersonContactRhythm(personId, type)
+        }
+        return RepositoryActionResult(true, "${existingLogs.size} temas kaydı silindi.")
     }
 
     suspend fun logPreferredInteraction(personId: Int, note: String = "") {

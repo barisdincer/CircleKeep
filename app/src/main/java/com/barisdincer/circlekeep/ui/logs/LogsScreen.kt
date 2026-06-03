@@ -61,6 +61,8 @@ import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
+import com.barisdincer.circlekeep.ui.components.interactionEventGroups
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,6 +77,7 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
     val uiMessage by viewModel.uiMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetState by remember { mutableStateOf<LogSheetState?>(null) }
+    val eventGroups = remember(logs) { interactionEventGroups(logs) }
 
     LaunchedEffect(uiMessage) {
         val message = uiMessage ?: return@LaunchedEffect
@@ -127,7 +130,7 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
                     ) {
                         Icon(Icons.Default.History, contentDescription = null)
                         Text(
-                            "${logs.size} temas kaydı",
+                            "${eventGroups.size} etkinlik · ${logs.size} temas kaydı",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -145,37 +148,35 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
 
-            items(logs, key = { it.id }) { log ->
-                val person = people.find { it.id == log.personId }
-                val wave = waves.find { it.id == person?.waveId }
-                LogCard(
-                    log = log,
-                    person = person,
-                    wave = wave,
+            items(eventGroups, key = { "${it.timestamp}-${it.type}-${it.note}-${it.ids.joinToString("-")}" }) { group ->
+                EventLogCard(
+                    group = group,
+                    people = people,
+                    waves = waves,
                     contactTypes = contactTypes,
-                    onEdit = { sheetState = LogSheetState.Edit(log) },
-                    onDelete = { sheetState = LogSheetState.Delete(log) }
+                    onEdit = { sheetState = LogSheetState.Edit(group) },
+                    onDelete = { sheetState = LogSheetState.Delete(group) }
                 )
             }
         }
 
         sheetState?.let { sheet ->
             when (sheet) {
-                is LogSheetState.Edit -> EditLogSheet(
-                    log = sheet.log,
+                is LogSheetState.Edit -> EditEventSheet(
+                    group = sheet.group,
                     contactTypes = contactTypes,
                     onDismiss = { sheetState = null },
-                    onSave = { updated ->
-                        viewModel.updateInteractionLog(updated)
+                    onSave = { updatedLogs ->
+                        viewModel.updateInteractionLogs(updatedLogs)
                         sheetState = null
                     }
                 )
 
-                is LogSheetState.Delete -> DeleteLogSheet(
-                    log = sheet.log,
+                is LogSheetState.Delete -> DeleteEventSheet(
+                    group = sheet.group,
                     onDismiss = { sheetState = null },
                     onDelete = {
-                        viewModel.deleteInteractionLog(sheet.log.id)
+                        viewModel.deleteInteractionLogs(sheet.group.ids)
                         sheetState = null
                     }
                 )
@@ -185,14 +186,21 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
 }
 
 @Composable
-private fun LogCard(
-    log: InteractionLog,
-    person: Person?,
-    wave: Wave?,
+private fun EventLogCard(
+    group: InteractionEventGroup,
+    people: List<Person>,
+    waves: List<Wave>,
     contactTypes: List<ContactType>,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val participants = group.personIds.mapNotNull { id -> people.find { it.id == id } }
+    val participantText = participants.joinToString(", ") { it.name }.ifBlank { "Silinmiş kişiler" }
+    val groupNames = participants
+        .map { person -> waves.find { it.id == person.waveId }?.name ?: "Grup yok" }
+        .distinct()
+        .joinToString(", ")
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -205,26 +213,37 @@ private fun LogCard(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(person?.name ?: "Silinmiş kişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "${interactionTypeLabel(log.type, contactTypes)} · ${formatLogDate(log.timestamp)}",
+                    "${interactionTypeLabel(group.type, contactTypes)} · ${group.participantCount} kişi",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    formatLogDate(group.timestamp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    wave?.name ?: "Grup yok",
+                    participantText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (log.note.isNotBlank()) {
-                    Text(log.note, style = MaterialTheme.typography.bodyMedium)
+                if (groupNames.isNotBlank()) {
+                    Text(
+                        groupNames,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (group.note.isNotBlank()) {
+                    Text(group.note, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Logu düzenle")
+                Icon(Icons.Default.Edit, contentDescription = "Etkinliği düzenle")
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Logu sil")
+                Icon(Icons.Default.Delete, contentDescription = "Etkinliği sil")
             }
         }
     }
@@ -232,16 +251,16 @@ private fun LogCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EditLogSheet(
-    log: InteractionLog,
+private fun EditEventSheet(
+    group: InteractionEventGroup,
     contactTypes: List<ContactType>,
     onDismiss: () -> Unit,
-    onSave: (InteractionLog) -> Unit
+    onSave: (List<InteractionLog>) -> Unit
 ) {
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
-    var selectedTypeKey by remember(log.id, typeOptions) { mutableStateOf(log.type) }
-    var timestamp by remember(log.id) { mutableStateOf(log.timestamp) }
-    var note by remember(log.id) { mutableStateOf(log.note) }
+    var selectedTypeKey by remember(group.ids, typeOptions) { mutableStateOf(group.type) }
+    var timestamp by remember(group.ids) { mutableStateOf(group.timestamp) }
+    var note by remember(group.ids) { mutableStateOf(group.note) }
     var typeExpanded by remember { mutableStateOf(false) }
     val selectedType = typeOptions.find { it.key == selectedTypeKey }
         ?: DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL }
@@ -251,7 +270,12 @@ private fun EditLogSheet(
             modifier = Modifier.fillMaxWidth().imePadding().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Logu düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Etkinliği düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "${group.participantCount} kişi için tarih, tür ve not birlikte güncellenir.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = !typeExpanded }) {
                 OutlinedTextField(
@@ -297,7 +321,9 @@ private fun EditLogSheet(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = { onSave(log.copy(type = selectedTypeKey, timestamp = timestamp, note = note)) },
+                    onClick = {
+                        onSave(group.logs.map { it.copy(type = selectedTypeKey, timestamp = timestamp, note = note) })
+                    },
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Kaydet")
@@ -310,8 +336,8 @@ private fun EditLogSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeleteLogSheet(
-    log: InteractionLog,
+private fun DeleteEventSheet(
+    group: InteractionEventGroup,
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -320,9 +346,9 @@ private fun DeleteLogSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Log silinsin mi?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Etkinlik silinsin mi?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "${formatLogDate(log.timestamp)} tarihli temas kaydı silinecek. Kişinin son temas tarihi yeniden hesaplanır.",
+                "${formatLogDate(group.timestamp)} tarihli ${group.participantCount} kişilik etkinlik silinecek. İlgili son temas tarihleri yeniden hesaplanır.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -341,8 +367,8 @@ private fun DeleteLogSheet(
 }
 
 private sealed interface LogSheetState {
-    data class Edit(val log: InteractionLog) : LogSheetState
-    data class Delete(val log: InteractionLog) : LogSheetState
+    data class Edit(val group: InteractionEventGroup) : LogSheetState
+    data class Delete(val group: InteractionEventGroup) : LogSheetState
 }
 
 private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>): String {
@@ -355,5 +381,5 @@ private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>):
 }
 
 private fun formatLogDate(timestamp: Long): String {
-    return SimpleDateFormat("d MMM yyyy HH:mm", Locale("tr", "TR")).format(Date(timestamp))
+    return SimpleDateFormat("d MMM yyyy", Locale("tr", "TR")).format(Date(timestamp))
 }

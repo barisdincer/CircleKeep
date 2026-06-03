@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
@@ -71,9 +69,8 @@ import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.data.statusLabel
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
+import com.barisdincer.circlekeep.ui.components.interactionEventGroups
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -98,11 +95,12 @@ fun GroupDetailScreen(
     val groupLogs = interactions
         .filter { it.personId in groupPersonIds }
         .sortedByDescending { it.timestamp }
+    val groupEvents = interactionEventGroups(groupLogs)
 
     var showExistingPersonSheet by remember { mutableStateOf(false) }
     var showGroupLogSheet by remember { mutableStateOf(false) }
-    var editingLog by remember { mutableStateOf<InteractionLog?>(null) }
-    var deletingLog by remember { mutableStateOf<InteractionLog?>(null) }
+    var editingEvent by remember { mutableStateOf<InteractionEventGroup?>(null) }
+    var deletingEvent by remember { mutableStateOf<InteractionEventGroup?>(null) }
 
     LaunchedEffect(uiMessage) {
         val message = uiMessage ?: return@LaunchedEffect
@@ -201,7 +199,7 @@ fun GroupDetailScreen(
                 Text("Temas geçmişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
-            if (groupLogs.isEmpty()) {
+            if (groupEvents.isEmpty()) {
                 item {
                     Text(
                         "Bu grup için temas kaydı yok.",
@@ -211,14 +209,13 @@ fun GroupDetailScreen(
                 }
             }
 
-            items(groupLogs, key = { "${it.id}-${it.personId}-${it.timestamp}-${it.type}" }) { log ->
-                val person = people.find { it.id == log.personId }
-                GroupNoteCard(
-                    log = log,
-                    personName = person?.name ?: "Kişi",
+            items(groupEvents, key = { "${it.timestamp}-${it.type}-${it.note}-${it.ids.joinToString("-")}" }) { event ->
+                GroupEventCard(
+                    group = event,
+                    people = people,
                     contactTypes = contactTypes,
-                    onEdit = { editingLog = log },
-                    onDelete = { deletingLog = log }
+                    onEdit = { editingEvent = event },
+                    onDelete = { deletingEvent = event }
                 )
             }
         }
@@ -246,25 +243,25 @@ fun GroupDetailScreen(
             )
         }
 
-        editingLog?.let { log ->
-            EditGroupLogSheet(
-                log = log,
+        editingEvent?.let { event ->
+            EditGroupEventSheet(
+                group = event,
                 contactTypes = contactTypes,
-                onDismiss = { editingLog = null },
-                onSave = { updated ->
-                    viewModel.updateInteractionLog(updated)
-                    editingLog = null
+                onDismiss = { editingEvent = null },
+                onSave = { updatedLogs ->
+                    viewModel.updateInteractionLogs(updatedLogs)
+                    editingEvent = null
                 }
             )
         }
 
-        deletingLog?.let { log ->
-            DeleteGroupLogSheet(
-                log = log,
-                onDismiss = { deletingLog = null },
+        deletingEvent?.let { event ->
+            DeleteGroupEventSheet(
+                group = event,
+                onDismiss = { deletingEvent = null },
                 onDelete = {
-                    viewModel.deleteInteractionLog(log.id)
-                    deletingLog = null
+                    viewModel.deleteInteractionLogs(event.ids)
+                    deletingEvent = null
                 }
             )
         }

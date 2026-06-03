@@ -239,6 +239,30 @@ class NetworkRepositoryTest {
     }
 
     @Test
+    fun `updating grouped event logs refreshes every participant`() = runBlocking {
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
+        repository.insertPerson(Person(id = 2, name = "Mehmet", phoneNumber = "5322222222", waveId = null, addedDate = 20L, lastInteractionDate = 20L))
+        repository.logInteractions(
+            personIds = listOf(1, 2),
+            type = DefaultContactTypes.MEETING,
+            note = "Eski not",
+            timestamp = 100L
+        )
+        val updatedLogs = repository.getInteractionSnapshot().map {
+            it.copy(type = DefaultContactTypes.CALL, note = "Yeni not", timestamp = 300L)
+        }
+
+        val result = repository.updateInteractionLogs(updatedLogs)
+
+        val people = repository.getPeopleSnapshot().sortedBy { it.id }
+        val logs = repository.getInteractionSnapshot().sortedBy { it.personId }
+        assertTrue(result.success)
+        assertEquals(listOf(300L, 300L), people.map { it.lastInteractionDate })
+        assertEquals(listOf(DefaultContactTypes.CALL, DefaultContactTypes.CALL), logs.map { it.type })
+        assertEquals(listOf("Yeni not", "Yeni not"), logs.map { it.note })
+    }
+
+    @Test
     fun `deleting latest log falls back to previous log or added date`() = runBlocking {
         repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
         repository.logInteraction(personId = 1, type = DefaultContactTypes.CALL, timestamp = 100L)
@@ -255,5 +279,25 @@ class NetworkRepositoryTest {
 
         assertEquals(10L, repository.getPeopleSnapshot().single().lastInteractionDate)
         assertTrue(repository.getInteractionSnapshot().isEmpty())
+    }
+
+    @Test
+    fun `deleting grouped event logs refreshes every participant`() = runBlocking {
+        repository.insertPerson(Person(id = 1, name = "Ayse", phoneNumber = "5321111111", waveId = null, addedDate = 10L, lastInteractionDate = 10L))
+        repository.insertPerson(Person(id = 2, name = "Mehmet", phoneNumber = "5322222222", waveId = null, addedDate = 20L, lastInteractionDate = 20L))
+        repository.logInteractions(
+            personIds = listOf(1, 2),
+            type = DefaultContactTypes.MEETING,
+            note = "Kahve",
+            timestamp = 300L
+        )
+        val ids = repository.getInteractionSnapshot().map { it.id }
+
+        val result = repository.deleteInteractionLogs(ids)
+
+        val people = repository.getPeopleSnapshot().sortedBy { it.id }
+        assertTrue(result.success)
+        assertTrue(repository.getInteractionSnapshot().isEmpty())
+        assertEquals(listOf(10L, 20L), people.map { it.lastInteractionDate })
     }
 }

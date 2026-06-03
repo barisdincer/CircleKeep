@@ -241,6 +241,9 @@ interface NetworkDao {
     @Query("SELECT * FROM interaction_logs WHERE id = :id LIMIT 1")
     suspend fun getInteractionLogById(id: Int): InteractionLog?
 
+    @Query("SELECT * FROM interaction_logs WHERE id IN (:ids)")
+    suspend fun getInteractionLogsByIds(ids: List<Int>): List<InteractionLog>
+
     @Query("SELECT * FROM interaction_logs ORDER BY timestamp DESC")
     suspend fun getInteractionSnapshot(): List<InteractionLog>
 
@@ -256,8 +259,14 @@ interface NetworkDao {
     @Update
     suspend fun updateInteractionLog(log: InteractionLog)
 
+    @Update
+    suspend fun updateInteractionLogs(logs: List<InteractionLog>)
+
     @Query("DELETE FROM interaction_logs WHERE id = :id")
     suspend fun deleteInteractionLogById(id: Int)
+
+    @Query("DELETE FROM interaction_logs WHERE id IN (:ids)")
+    suspend fun deleteInteractionLogsByIds(ids: List<Int>)
 
     @Query("DELETE FROM interaction_logs")
     suspend fun clearInteractionLogs()

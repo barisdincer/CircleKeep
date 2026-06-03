@@ -299,9 +299,21 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         }
     }
 
+    fun updateInteractionLogs(logs: List<InteractionLog>) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.updateInteractionLogs(logs).message
+        }
+    }
+
     fun deleteInteractionLog(id: Int) {
         viewModelScope.launch {
             _uiMessage.value = repository.deleteInteractionLog(id).message
+        }
+    }
+
+    fun deleteInteractionLogs(ids: List<Int>) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.deleteInteractionLogs(ids).message
         }
     }
 
