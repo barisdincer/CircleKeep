@@ -49,6 +49,7 @@ import com.barisdincer.circlekeep.data.contactActionLabel
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.PersonWithWave
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CircleSearchField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,6 +219,19 @@ private fun ParticipantPicker(
     onSelectionChange: (Set<Int>) -> Unit
 ) {
     val selectedPeople = people.filter { it.id in selectedPersonIds }
+    var searchQuery by remember { mutableStateOf("") }
+    val visiblePeople = remember(people, searchQuery) {
+        val sorted = people.sortedByTurkish { it.name }
+        if (searchQuery.isBlank()) {
+            sorted
+        } else {
+            val query = searchQuery.trim()
+            sorted.filter { person ->
+                person.name.contains(query, ignoreCase = true) ||
+                    person.phoneNumber.contains(query, ignoreCase = true)
+            }
+        }
+    }
     ExposedDropdownMenuBox(
         expanded = groupExpanded,
         onExpandedChange = { onGroupExpandedChange(!groupExpanded) }
@@ -257,11 +271,33 @@ private fun ParticipantPicker(
         }
     }
 
+    CircleSearchField(
+        value = searchQuery,
+        onValueChange = { searchQuery = it },
+        placeholder = "Katılımcı ara"
+    )
+
     LazyColumn(
         modifier = Modifier.heightIn(max = 260.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        items(people.sortedByTurkish { it.name }, key = { it.id }) { person ->
+        if (visiblePeople.isEmpty()) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Text(
+                        "Eşleşen kişi yok",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        items(visiblePeople, key = { it.id }) { person ->
             val checked = person.id in selectedPersonIds
             Row(
                 modifier = Modifier

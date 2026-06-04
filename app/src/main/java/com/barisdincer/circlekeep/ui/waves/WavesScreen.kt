@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.ui.NetworkViewModel
+import com.barisdincer.circlekeep.ui.design.CircleSearchField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +78,17 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var sheetState by remember { mutableStateOf<ManagementSheet?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredWaves = remember(waves, searchQuery) {
+        if (searchQuery.isBlank()) waves else waves.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
+    }
+    val filteredContactTypes = remember(contactTypes, searchQuery) {
+        if (searchQuery.isBlank()) {
+            contactTypes
+        } else {
+            contactTypes.filter { it.label.contains(searchQuery.trim(), ignoreCase = true) }
+        }
+    }
 
     LaunchedEffect(managementMessage) {
         val message = managementMessage ?: return@LaunchedEffect
@@ -143,6 +155,14 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
                 }
             }
 
+            item {
+                CircleSearchField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = if (selectedTab == 0) "Grup ara" else "İletişim türü ara"
+                )
+            }
+
             if (selectedTab == 0) {
                 if (waves.isEmpty()) {
                     item {
@@ -152,7 +172,15 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
                         )
                     }
                 }
-                items(waves, key = { it.id }) { wave ->
+                if (waves.isNotEmpty() && filteredWaves.isEmpty()) {
+                    item {
+                        EmptyManagementState(
+                            title = "Eşleşen grup yok",
+                            body = "Aramayı temizleyerek tüm grupları yeniden görebilirsin."
+                        )
+                    }
+                }
+                items(filteredWaves, key = { it.id }) { wave ->
                     GroupCard(
                         wave = wave,
                         personCount = people.count { it.waveId == wave.id },
@@ -170,7 +198,15 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
                         )
                     }
                 }
-                items(contactTypes, key = { it.key }) { type ->
+                if (contactTypes.isNotEmpty() && filteredContactTypes.isEmpty()) {
+                    item {
+                        EmptyManagementState(
+                            title = "Eşleşen tür yok",
+                            body = "Aramayı temizleyerek tüm iletişim türlerini yeniden görebilirsin."
+                        )
+                    }
+                }
+                items(filteredContactTypes, key = { it.key }) { type ->
                     ContactTypeCard(
                         type = type,
                         usageCount = contactRhythms.count { it.contactTypeKey == type.key } + interactions.count { it.type == type.key },

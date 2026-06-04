@@ -146,8 +146,30 @@ class NetworkRepository(private val networkDao: NetworkDao) {
         networkDao.updatePerson(person.withNormalizedPhone())
         if (person.id > 0) {
             networkDao.insertPersonContactRhythmIfMissing(person.id, person.preferredContactTypeKey)
-            networkDao.updatePersonContactRhythmsCustomFrequency(person.id, person.customFrequencyDays?.takeIf { it > 0 })
         }
+    }
+
+    suspend fun updatePersonRhythmSettings(
+        person: Person,
+        rhythmFrequencyDaysByType: Map<String, Int?>
+    ): RepositoryActionResult {
+        val personId = person.id
+        if (personId <= 0) {
+            return RepositoryActionResult(false, "Kişi bulunamadı.")
+        }
+
+        updatePerson(person)
+        rhythmFrequencyDaysByType.forEach { (type, frequencyDays) ->
+            if (type.isNotBlank()) {
+                networkDao.insertPersonContactRhythmIfMissing(personId, type)
+                networkDao.updatePersonContactRhythmCustomFrequency(
+                    personId = personId,
+                    type = type,
+                    customFrequencyDays = frequencyDays?.takeIf { it > 0 }
+                )
+            }
+        }
+        return RepositoryActionResult(true, "${person.name} ritimleri güncellendi.")
     }
 
     suspend fun deletePerson(id: Int): RepositoryActionResult {

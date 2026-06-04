@@ -62,6 +62,7 @@ import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.contactActionLabel
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CircleSearchField
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -74,12 +75,26 @@ fun EventLogScreen(
 ) {
     val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
     val sortedPeople = remember(people) { people.sortedByTurkish { it.name } }
+    val waveNamesById = remember(waves) { waves.associate { it.id to it.name } }
     var selectedPersonIds by remember(people) { mutableStateOf(emptySet<Int>()) }
     var selectedTypeKey by remember(typeOptions) { mutableStateOf(typeOptions.first().key) }
     var selectedTimestamp by remember { mutableStateOf(System.currentTimeMillis()) }
     var note by remember { mutableStateOf("") }
     var typeExpanded by remember { mutableStateOf(false) }
+    var participantSearch by remember { mutableStateOf("") }
     val selectedType = typeOptions.find { it.key == selectedTypeKey } ?: typeOptions.first()
+    val visiblePeople = remember(sortedPeople, waveNamesById, participantSearch) {
+        if (participantSearch.isBlank()) {
+            sortedPeople
+        } else {
+            val query = participantSearch.trim()
+            sortedPeople.filter { person ->
+                person.name.contains(query, ignoreCase = true) ||
+                    person.phoneNumber.contains(query, ignoreCase = true) ||
+                    waveNamesById[person.waveId].orEmpty().contains(query, ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -171,12 +186,23 @@ fun EventLogScreen(
                 ParticipantControls(
                     people = people,
                     waves = waves,
+                    searchQuery = participantSearch,
+                    onSearchQueryChange = { participantSearch = it },
                     selectedPersonIds = selectedPersonIds,
                     onSelectionChange = { selectedPersonIds = it }
                 )
             }
 
-            items(sortedPeople, key = { it.id }) { person ->
+            if (visiblePeople.isEmpty()) {
+                item {
+                    EventEmptyState(
+                        title = "Eşleşen kişi yok",
+                        body = "Aramayı temizleyerek tüm kişileri yeniden görebilirsin."
+                    )
+                }
+            }
+
+            items(visiblePeople, key = { it.id }) { person ->
                 val checked = person.id in selectedPersonIds
                 ParticipantRow(
                     person = person,
@@ -299,6 +325,8 @@ private fun EventPill(text: String) {
 private fun ParticipantControls(
     people: List<Person>,
     waves: List<Wave>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     selectedPersonIds: Set<Int>,
     onSelectionChange: (Set<Int>) -> Unit
 ) {
@@ -325,6 +353,11 @@ private fun ParticipantControls(
                     Text("Temizle")
                 }
             }
+            CircleSearchField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                placeholder = "Katılımcı, telefon veya grup ara"
+            )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = selectedPersonIds.size == people.size && people.isNotEmpty(),
@@ -353,6 +386,20 @@ private fun ParticipantControls(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EventEmptyState(title: String, body: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

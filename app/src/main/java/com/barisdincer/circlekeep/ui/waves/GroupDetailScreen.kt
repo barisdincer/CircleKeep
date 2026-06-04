@@ -34,6 +34,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +74,7 @@ import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
 import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
 import com.barisdincer.circlekeep.ui.components.interactionEventGroups
+import com.barisdincer.circlekeep.ui.design.CircleSearchField
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -92,8 +94,19 @@ fun GroupDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val wave = waves.find { it.id == waveId }
-    val groupPeople = people.filter { it.waveId == waveId }.sortedByTurkish { it.name }
-    val groupPersonIds = groupPeople.map { it.id }.toSet()
+    var memberSearch by remember { mutableStateOf("") }
+    var onlyWaitingMembers by remember { mutableStateOf(false) }
+    val allGroupPeople = people.filter { it.waveId == waveId }.sortedByTurkish { it.name }
+    val groupPeople = allGroupPeople.filter { person ->
+        val matchesSearch = memberSearch.isBlank() ||
+            person.name.contains(memberSearch, ignoreCase = true) ||
+            person.phoneNumber.contains(memberSearch, ignoreCase = true) ||
+            person.tags.contains(memberSearch, ignoreCase = true)
+        val rhythm = wave?.let { groupMemberRhythm(person, it) }
+        val matchesRhythm = !onlyWaitingMembers || rhythm?.let { it.isDueToday || it.isOverdue } == true
+        matchesSearch && matchesRhythm
+    }
+    val groupPersonIds = allGroupPeople.map { it.id }.toSet()
     val groupLogs = interactions
         .filter { it.personId in groupPersonIds }
         .sortedByDescending { it.timestamp }
@@ -174,7 +187,22 @@ fun GroupDetailScreen(
             }
 
             item {
-                Text("Üyeler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircleSearchField(
+                        value = memberSearch,
+                        onValueChange = { memberSearch = it },
+                        placeholder = "Grupta kişi ara"
+                    )
+                    FilterChip(
+                        selected = onlyWaitingMembers,
+                        onClick = { onlyWaitingMembers = !onlyWaitingMembers },
+                        label = { Text("Sadece bekleyenler") }
+                    )
+                }
+            }
+
+            item {
+                Text("Üyeler (${groupPeople.size}/${allGroupPeople.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
             if (groupPeople.isEmpty()) {
@@ -235,7 +263,7 @@ fun GroupDetailScreen(
 
         if (showGroupLogSheet) {
             GroupContactLogSheet(
-                groupPeople = groupPeople,
+                groupPeople = allGroupPeople,
                 contactTypes = activeContactTypes,
                 onDismiss = { showGroupLogSheet = false },
                 onSave = { personIds, type, note, timestamp ->

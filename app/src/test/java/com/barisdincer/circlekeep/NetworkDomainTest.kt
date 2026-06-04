@@ -199,7 +199,7 @@ class NetworkDomainTest {
     @Test
     fun `same person can have separate reminders for multiple contact types`() {
         val now = 100L * DAY_MILLIS
-        val group = Wave(id = 1, name = "Friends", frequencyDays = 30)
+        val group = Wave(id = 1, name = "Friends", frequencyDays = 60)
         val person = Person(
             id = 1,
             name = "Ayse",
@@ -211,11 +211,13 @@ class NetworkDomainTest {
             PersonContactRhythm(
                 personId = person.id,
                 contactTypeKey = DefaultContactTypes.CALL,
-                lastInteractionDate = now - 35L * DAY_MILLIS
+                customFrequencyDays = 7,
+                lastInteractionDate = now - 8L * DAY_MILLIS
             ),
             PersonContactRhythm(
                 personId = person.id,
                 contactTypeKey = DefaultContactTypes.MEETING,
+                customFrequencyDays = 30,
                 lastInteractionDate = now - 10L * DAY_MILLIS
             )
         )
@@ -234,8 +236,10 @@ class NetworkDomainTest {
         )
 
         assertEquals(listOf(DefaultContactTypes.CALL), dueContacts.map { it.contactTypeKey })
-        assertEquals(5L, dueContacts.first().daysOverdue)
+        assertEquals(7, dueContacts.first().effectiveFrequencyDays)
+        assertEquals(1L, dueContacts.first().daysOverdue)
         assertEquals(listOf(DefaultContactTypes.MEETING), nextContacts.map { it.contactTypeKey })
+        assertEquals(30, nextContacts.first().effectiveFrequencyDays)
         assertEquals(-20L, nextContacts.first().daysOverdue)
     }
 

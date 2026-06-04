@@ -41,6 +41,7 @@ import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
+import com.barisdincer.circlekeep.data.presentation.ReportMetricRow
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.ReminderDashboardUiState
 import java.util.Calendar
@@ -50,20 +51,7 @@ private const val DAY_MILLIS = 24L * 60L * 60L * 1000L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(viewModel: NetworkViewModel) {
-    val interactions by viewModel.allInteractions.collectAsState()
-    val people by viewModel.people.collectAsState()
-    val waves by viewModel.waves.collectAsState()
-    val contactTypes by viewModel.contactTypes.collectAsState()
-    val dashboard by viewModel.dashboardReminders.collectAsState()
-
-    val todayStart = todayStartMillis()
-    val last30Start = todayStart - 29 * DAY_MILLIS
-    val recentInteractions = interactions.count { it.timestamp >= last30Start }
-    val reachedPeople = interactions
-        .filter { it.timestamp >= last30Start }
-        .map { it.personId }
-        .distinct()
-        .size
+    val summary by viewModel.reportsSummary.collectAsState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -90,27 +78,85 @@ fun ReportsScreen(viewModel: NetworkViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OverviewHeroCard(
-                peopleCount = people.size,
-                totalInteractions = interactions.size,
-                recentInteractions = recentInteractions,
-                reachedPeople = reachedPeople
+                peopleCount = summary.peopleCount,
+                totalInteractions = summary.totalInteractionCount,
+                recentInteractions = summary.recentInteractionCount,
+                reachedPeople = summary.reachedPeopleCount
             )
 
-            RhythmHealthCard(dashboard = dashboard)
-
-            ContactFreshnessCard(people = people)
-
-            ContactTypeDistributionCard(
-                interactions = interactions,
-                contactTypes = contactTypes
+            SummaryDistributionCard(
+                title = "Ritim durumu",
+                body = "${summary.waitingCount} bekleyen ritim var. Sıradakiler ve ertelemeler toplam görünüm içinde izlenir.",
+                rows = summary.rhythmRows
             )
 
-            GroupCoverageCard(
-                people = people,
-                waves = waves
+            SummaryDistributionCard(
+                title = "Son temas tazeliği",
+                body = "Kişilerin ne kadar zamandır temas beklediğini daha net gösterir.",
+                rows = summary.freshnessRows
+            )
+
+            SummaryDistributionCard(
+                title = "Temas türleri",
+                body = "Arama, mesaj ve buluşmaların toplam geçmiş içindeki ağırlığı.",
+                rows = summary.contactTypeRows,
+                emptyText = "Henüz temas kaydı yok."
+            )
+
+            SummaryDistributionCard(
+                title = "Grup kapsamı",
+                body = "Kişilerin hangi gruplarda yoğunlaştığını gösterir.",
+                rows = summary.groupRows
             )
 
             Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun SummaryDistributionCard(
+    title: String,
+    body: String,
+    rows: List<ReportMetricRow>,
+    emptyText: String = "Henüz veri yok."
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (rows.isEmpty()) {
+                Text(
+                    emptyText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                SegmentedBar(
+                    segments = rows.mapIndexed { index, row ->
+                        Segment(row.progress, distributionColor(index))
+                    }
+                )
+                rows.forEachIndexed { index, row ->
+                    DistributionRow(
+                        label = row.label,
+                        count = row.count,
+                        progress = row.progress,
+                        color = distributionColor(index)
+                    )
+                }
+            }
         }
     }
 }

@@ -193,7 +193,7 @@ class NetworkRepositoryTest {
     }
 
     @Test
-    fun `updating person custom frequency syncs all selected contact rhythms`() = runBlocking {
+    fun `person contact rhythms can have separate custom frequencies`() = runBlocking {
         repository.insertPerson(
             Person(
                 id = 1,
@@ -206,10 +206,17 @@ class NetworkRepositoryTest {
         repository.setPersonContactRhythmActive(1, DefaultContactTypes.MEETING, true)
 
         val person = repository.getPeopleSnapshot().single()
-        repository.updatePerson(person.copy(customFrequencyDays = 45))
+        val result = repository.updatePersonRhythmSettings(
+            person = person,
+            rhythmFrequencyDaysByType = mapOf(
+                DefaultContactTypes.CALL to 7,
+                DefaultContactTypes.MEETING to 30
+            )
+        )
 
         val rhythms = repository.getPersonContactRhythmSnapshot().sortedBy { it.contactTypeKey }
-        assertEquals(listOf(45, 45), rhythms.map { it.customFrequencyDays })
+        assertTrue(result.success)
+        assertEquals(listOf(7, 30), rhythms.map { it.customFrequencyDays })
     }
 
     @Test

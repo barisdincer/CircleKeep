@@ -13,6 +13,10 @@ import com.barisdincer.circlekeep.data.NetworkBackupCodec
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.PersonContactRhythm
 import com.barisdincer.circlekeep.data.Wave
+import com.barisdincer.circlekeep.data.presentation.DashboardPresentation
+import com.barisdincer.circlekeep.data.presentation.ReportsSummary
+import com.barisdincer.circlekeep.data.presentation.buildDashboardPresentation
+import com.barisdincer.circlekeep.data.presentation.buildReportsSummary
 import com.barisdincer.circlekeep.device.CallLogSyncManager
 import java.util.Calendar
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +62,51 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
 
     val allInteractions: StateFlow<List<InteractionLog>> = repository.allInteractions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dashboardPresentation: StateFlow<DashboardPresentation> = combine(
+        repository.allPeople,
+        repository.allWaves,
+        repository.allPersonContactRhythms,
+        repository.allContactTypes,
+        repository.recentInteractions
+    ) { people, waves, rhythms, types, interactions ->
+        buildDashboardPresentation(
+            people = people,
+            waves = waves,
+            rhythms = rhythms,
+            contactTypes = types,
+            interactions = interactions
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardPresentation())
+
+    val reportsSummary: StateFlow<ReportsSummary> = combine(
+        repository.allPeople,
+        repository.allWaves,
+        repository.allPersonContactRhythms,
+        repository.allContactTypes,
+        repository.allInteractions
+    ) { people, waves, rhythms, types, interactions ->
+        buildReportsSummary(
+            people = people,
+            waves = waves,
+            rhythms = rhythms,
+            contactTypes = types,
+            interactions = interactions
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        ReportsSummary(
+            peopleCount = 0,
+            totalInteractionCount = 0,
+            recentInteractionCount = 0,
+            reachedPeopleCount = 0,
+            rhythmRows = emptyList(),
+            freshnessRows = emptyList(),
+            contactTypeRows = emptyList(),
+            groupRows = emptyList()
+        )
+    )
 
     val uniqueTags: StateFlow<List<String>> = repository.allPeople.map { people ->
         people.flatMap { it.tags.split(",") }
@@ -241,6 +290,12 @@ class NetworkViewModel(private val repository: NetworkRepository) : ViewModel() 
         viewModelScope.launch {
             repository.updatePerson(person)
             _uiMessage.value = "${person.name} güncellendi."
+        }
+    }
+
+    fun updatePersonRhythmSettings(person: Person, rhythmFrequencyDaysByType: Map<String, Int?>) {
+        viewModelScope.launch {
+            _uiMessage.value = repository.updatePersonRhythmSettings(person, rhythmFrequencyDaysByType).message
         }
     }
 

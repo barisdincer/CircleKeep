@@ -68,7 +68,7 @@ fun PersonDetailScreen(
     var editPreferredContactTypeKey by remember { mutableStateOf(person?.preferredContactTypeKey.orEmpty()) }
     var editNotes by remember { mutableStateOf(person?.notes ?: "") }
     var editTags by remember { mutableStateOf(person?.tags ?: "") }
-    var editCustomFrequency by remember { mutableStateOf(person?.customFrequencyDays?.toString().orEmpty()) }
+    var editRhythmFrequencies by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var editMemoryNotes by remember { mutableStateOf(person?.memoryNotes ?: "") }
     var editNextHint by remember { mutableStateOf(person?.nextConversationHint ?: "") }
     var editImportantLabel by remember { mutableStateOf(person?.importantDateLabel ?: "") }
@@ -78,11 +78,13 @@ fun PersonDetailScreen(
     var showDeletePersonDialog by remember { mutableStateOf(false) }
     var waveExpanded by remember { mutableStateOf(false) }
     var typeExpanded by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(person) {
+    LaunchedEffect(person, personRhythms, activeContactTypes) {
         if (person != null) {
+            val rhythmsByType = personRhythms.associateBy { it.contactTypeKey }
             editName = person.name
             editPhone = person.phoneNumber
             editWaveId = person.waveId
@@ -90,7 +92,9 @@ fun PersonDetailScreen(
             editPreferredContactTypeKey = person.preferredContactTypeKey
             editNotes = person.notes
             editTags = person.tags
-            editCustomFrequency = person.customFrequencyDays?.toString().orEmpty()
+            editRhythmFrequencies = activeContactTypes.associate { type ->
+                type.key to rhythmsByType[type.key]?.customFrequencyDays?.toString().orEmpty()
+            }
             editMemoryNotes = person.memoryNotes
             editNextHint = person.nextConversationHint
             editImportantLabel = person.importantDateLabel
@@ -159,6 +163,11 @@ fun PersonDetailScreen(
                 )
             }
 
+            item {
+                PersonDetailTabs(selectedTab = selectedTab, onSelect = { selectedTab = it })
+            }
+
+            if (selectedTab == 0) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -256,7 +265,9 @@ fun PersonDetailScreen(
                     }
                 }
             }
+            }
 
+            if (selectedTab == 1) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -335,21 +346,48 @@ fun PersonDetailScreen(
                                 }
                             }
                             Text(
-                                "Bir kişide birden fazla tür seçilirse Bugün ekranında her tür kendi son temasına göre ayrı görünür.",
+                                "Bir kişide birden fazla tür seçilirse her tür kendi son temasına ve kendi ritmine göre görünür.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        OutlinedTextField(
-                            value = editCustomFrequency,
-                            onValueChange = {
-                                editCustomFrequency = it.filter { char -> char.isDigit() }
-                            },
-                            label = { Text("Kişiye özel ritim") },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Boşsa grup gün sayısı kullanılır") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Tür bazlı ritimler", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            activeContactTypes
+                                .filter { it.key in selectedContactTypeKeys }
+                                .forEach { type ->
+                                    val fallbackDays = person.customFrequencyDays?.takeIf { it > 0 }
+                                        ?: waves.find { it.id == person.waveId }?.frequencyDays
+                                    OutlinedTextField(
+                                        value = editRhythmFrequencies[type.key].orEmpty(),
+                                        onValueChange = { value ->
+                                            editRhythmFrequencies = editRhythmFrequencies + (type.key to value.filter { char -> char.isDigit() })
+                                        },
+                                        label = { Text("${type.label} ritmi") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        placeholder = {
+                                            Text(fallbackDays?.let { "Boşsa $it gün" } ?: "Örn. 7")
+                                        },
+                                        suffix = { Text("gün") },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
+                            if (selectedContactTypeKeys.isEmpty()) {
+                                Text(
+                                    "Ritim vermek için en az bir iletişim türünü takibe al.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    "Örn. Arama 7 gün, Buluşma 30 gün olabilir. Boş alanlar grup veya kişi varsayılanını kullanır.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         person.lastCallLogSyncDate?.let { syncDate ->
                             val syncDateStr = SimpleDateFormat("d MMM yyyy HH:mm", Locale("tr", "TR")).format(Date(syncDate))
                             Text(
@@ -367,13 +405,22 @@ fun PersonDetailScreen(
                         )
                         Button(
                             onClick = {
-                                viewModel.updatePerson(
+                                val selectedKeys = selectedContactTypeKeys.ifEmpty {
+                                    setOf(editPreferredContactTypeKey.ifBlank { person.preferredContactTypeKey })
+                                }
+                                val preferredKey = editPreferredContactTypeKey
+                                    .ifBlank { person.preferredContactTypeKey }
+                                    .takeIf { it in selectedKeys }
+                                    ?: selectedKeys.first()
+                                viewModel.updatePersonRhythmSettings(
                                     person.copy(
                                         reminderEnabled = editReminderEnabled,
-                                        preferredContactTypeKey = editPreferredContactTypeKey.ifBlank { person.preferredContactTypeKey },
-                                        customFrequencyDays = editCustomFrequency.toIntOrNull()?.takeIf { days -> days > 0 },
+                                        preferredContactTypeKey = preferredKey,
                                         tags = editTags
-                                    )
+                                    ),
+                                    selectedKeys.associateWith { key ->
+                                        editRhythmFrequencies[key]?.toIntOrNull()?.takeIf { days -> days > 0 }
+                                    }
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -384,7 +431,9 @@ fun PersonDetailScreen(
                     }
                 }
             }
+            }
 
+            if (selectedTab == 2) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -461,7 +510,9 @@ fun PersonDetailScreen(
                     }
                 }
             }
+            }
 
+            if (selectedTab == 3) {
             item {
                 Text("Temas geçmişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
             }
@@ -505,6 +556,7 @@ fun PersonDetailScreen(
                         }
                     }
                 }
+            }
             }
         }
 
@@ -566,232 +618,5 @@ fun PersonDetailScreen(
                 }
             )
         }
-    }
-}
-
-@Composable
-private fun PersonHeroCard(
-    name: String,
-    phoneNumber: String,
-    groupName: String,
-    lastInteractionDate: Long,
-    contactTypeCount: Int,
-    onCall: () -> Unit,
-    onMessage: () -> Unit,
-    onEmail: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        personInitials(name),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        phoneNumber.ifBlank { "Telefon eklenmemiş" },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        DetailPill(groupName)
-                        DetailPill("$contactTypeCount tür")
-                    }
-                }
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "Son temas",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        formatPersonDate(lastInteractionDate),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(
-                    onClick = onCall,
-                    modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Ara")
-                }
-                FilledTonalButton(
-                    onClick = onMessage,
-                    modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Mesaj")
-                }
-                FilledTonalButton(
-                    onClick = onEmail,
-                    modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("E-posta")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DetailPill(text: String) {
-    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-        Text(
-            text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-private fun personInitials(name: String): String {
-    return name
-        .split(" ")
-        .filter { it.isNotBlank() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifBlank { "CK" }
-}
-
-private fun formatPersonDate(timestamp: Long): String {
-    return SimpleDateFormat("d MMM yyyy", Locale("tr", "TR")).format(Date(timestamp))
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditPersonLogSheet(
-    log: InteractionLog,
-    contactTypes: List<ContactType>,
-    onDismiss: () -> Unit,
-    onSave: (InteractionLog) -> Unit
-) {
-    val typeOptions = contactTypes.ifEmpty { DefaultContactTypes.all }
-    var selectedTypeKey by remember(log.id, typeOptions) { mutableStateOf(log.type) }
-    var timestamp by remember(log.id) { mutableStateOf(log.timestamp) }
-    var note by remember(log.id) { mutableStateOf(log.note) }
-    var typeExpanded by remember { mutableStateOf(false) }
-    val selectedType = typeOptions.find { it.key == selectedTypeKey }
-        ?: DefaultContactTypes.all.first { it.key == DefaultContactTypes.CALL }
-
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 620.dp)
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Temas kaydını düzenle", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-            ExposedDropdownMenuBox(expanded = typeExpanded, onExpandedChange = { typeExpanded = !typeExpanded }) {
-                OutlinedTextField(
-                    value = selectedType.label,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("İletişim türü") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
-                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                )
-                ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
-                    typeOptions.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.label) },
-                            onClick = {
-                                selectedTypeKey = type.key
-                                typeExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            DatePickerField(
-                label = "Tarih",
-                selectedMillis = timestamp,
-                onDateSelected = { timestamp = it }
-            )
-
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text("Not") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                shape = RoundedCornerShape(8.dp)
-            )
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) {
-                    Text("Vazgeç")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { onSave(log.copy(type = selectedTypeKey, timestamp = timestamp, note = note)) },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Kaydet")
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-    }
-}
-
-private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>): String {
-    return contactTypes.find { it.key == type }?.label ?: when (type) {
-        DefaultContactTypes.CALL -> "Arama"
-        DefaultContactTypes.MESSAGE -> "Mesaj"
-        DefaultContactTypes.MEETING -> "Buluşma"
-        else -> type
     }
 }

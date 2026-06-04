@@ -55,6 +55,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,11 +65,18 @@ import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.Wave
+import com.barisdincer.circlekeep.data.presentation.InteractionLogEvent
+import com.barisdincer.circlekeep.data.presentation.InteractionLogQuery
+import com.barisdincer.circlekeep.data.presentation.InteractionLogView
+import com.barisdincer.circlekeep.data.presentation.buildInteractionLogPresentation
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
-import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
-import com.barisdincer.circlekeep.ui.components.interactionEventGroups
+import com.barisdincer.circlekeep.ui.design.CircleEmptyState
+import com.barisdincer.circlekeep.ui.design.CircleFilterOption
+import com.barisdincer.circlekeep.ui.design.CircleFilterRow
+import com.barisdincer.circlekeep.ui.design.CircleSearchField
+import com.barisdincer.circlekeep.ui.design.CircleSectionHeader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -83,7 +91,17 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
     val uiMessage by viewModel.uiMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetState by remember { mutableStateOf<LogSheetState?>(null) }
-    val eventGroups = remember(logs) { interactionEventGroups(logs) }
+    var searchTerm by rememberSaveable { mutableStateOf("") }
+    var selectedView by rememberSaveable { mutableStateOf(InteractionLogView.ALL) }
+    val logPresentation = remember(logs, people, waves, contactTypes, searchTerm, selectedView) {
+        buildInteractionLogPresentation(
+            logs = logs,
+            people = people,
+            waves = waves,
+            contactTypes = contactTypes,
+            query = InteractionLogQuery(searchTerm = searchTerm, view = selectedView)
+        )
+    }
 
     LaunchedEffect(uiMessage) {
         val message = uiMessage ?: return@LaunchedEffect
@@ -136,7 +154,7 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
                     ) {
                         Icon(Icons.Default.History, contentDescription = null)
                         Text(
-                            "${eventGroups.size} etkinlik · ${logs.size} temas kaydı",
+                            "${logPresentation.eventCount} etkinlik · ${logPresentation.filteredRecordCount}/${logPresentation.totalRecordCount} temas kaydı",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -144,22 +162,52 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
 
-            if (logs.isEmpty()) {
+            item {
+                CircleSearchField(
+                    value = searchTerm,
+                    onValueChange = { searchTerm = it },
+                    placeholder = "Kişi, grup, tür veya not ara"
+                )
+            }
+
+            item {
+                CircleFilterRow(
+                    options = listOf(
+                        CircleFilterOption(InteractionLogView.ALL, "Tümü"),
+                        CircleFilterOption(InteractionLogView.LAST_30_DAYS, "30 gün"),
+                        CircleFilterOption(InteractionLogView.CALLS, "Arama"),
+                        CircleFilterOption(InteractionLogView.MESSAGES, "Mesaj"),
+                        CircleFilterOption(InteractionLogView.MEETINGS, "Buluşma")
+                    ),
+                    selected = selectedView,
+                    onSelected = { selectedView = it }
+                )
+            }
+
+            item {
+                CircleSectionHeader(
+                    title = "Etkinlikler",
+                    count = logPresentation.eventCount,
+                    subtitle = "Aynı gün, tür ve notla eklenen temaslar tek etkinlik olarak gruplanır."
+                )
+            }
+
+            if (logPresentation.events.isEmpty()) {
                 item {
-                    Text(
-                        "Henüz temas kaydı yok.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    CircleEmptyState(
+                        title = if (logs.isEmpty()) "Henüz temas kaydı yok" else "Bu filtrede etkinlik yok",
+                        body = if (logs.isEmpty()) {
+                            "Dashboard’daki etkinlik ekleme akışıyla ilk teması kaydedebilirsin."
+                        } else {
+                            "Aramayı veya hazır görünümü değiştirerek kayıtları genişlet."
+                        }
                     )
                 }
             }
 
-            items(eventGroups, key = { "${it.timestamp}-${it.type}-${it.note}-${it.ids.joinToString("-")}" }) { group ->
+            items(logPresentation.events, key = { "${it.timestamp}-${it.type}-${it.note}-${it.ids.joinToString("-")}" }) { group ->
                 EventLogCard(
                     group = group,
-                    people = people,
-                    waves = waves,
-                    contactTypes = contactTypes,
                     onEdit = { sheetState = LogSheetState.Edit(group) },
                     onDelete = { sheetState = LogSheetState.Delete(group) }
                 )
@@ -194,19 +242,12 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
 
 @Composable
 private fun EventLogCard(
-    group: InteractionEventGroup,
-    people: List<Person>,
-    waves: List<Wave>,
-    contactTypes: List<ContactType>,
+    group: InteractionLogEvent,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val participants = group.personIds.mapNotNull { id -> people.find { it.id == id } }
-    val participantText = participants.joinToString(", ") { it.name }.ifBlank { "Silinmiş kişiler" }
-    val groupNames = participants
-        .map { person -> waves.find { it.id == person.waveId }?.name ?: "Grup yok" }
-        .distinct()
-        .joinToString(", ")
+    val participantText = group.participantNames.joinToString(", ").ifBlank { "Silinmiş kişiler" }
+    val groupNames = group.waveNames.joinToString(", ")
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -221,7 +262,7 @@ private fun EventLogCard(
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "${interactionTypeLabel(group.type, contactTypes)} · ${group.participantCount} kişi",
+                    "${group.typeLabel} · ${group.participantCount} kişi",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -259,7 +300,7 @@ private fun EventLogCard(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun EditEventSheet(
-    group: InteractionEventGroup,
+    group: InteractionLogEvent,
     people: List<Person>,
     contactTypes: List<ContactType>,
     onDismiss: () -> Unit,
@@ -377,7 +418,7 @@ private fun EditEventSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DeleteEventSheet(
-    group: InteractionEventGroup,
+    group: InteractionLogEvent,
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -407,8 +448,8 @@ private fun DeleteEventSheet(
 }
 
 private sealed interface LogSheetState {
-    data class Edit(val group: InteractionEventGroup) : LogSheetState
-    data class Delete(val group: InteractionEventGroup) : LogSheetState
+    data class Edit(val group: InteractionLogEvent) : LogSheetState
+    data class Delete(val group: InteractionLogEvent) : LogSheetState
 }
 
 private fun interactionTypeLabel(type: String, contactTypes: List<ContactType>): String {

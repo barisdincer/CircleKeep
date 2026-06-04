@@ -39,6 +39,9 @@ The current project intentionally avoids analytics, ads, cloud sync, remote conf
 ## Permissions Explained
 
 CircleKeep asks only for permissions that map directly to user-visible features.
+Permission prompts are contextual: contacts are requested from import actions,
+call-log access is requested from the Dashboard matching action, and Android
+13+ notification permission is requested from the Dashboard reminder card.
 
 `READ_CONTACTS`
 : Used to import selected people from the device address book. Contacts are not uploaded.
@@ -73,9 +76,9 @@ Database migrations are explicit and non-destructive. Existing local data is mig
 
 ### APK Install Notes
 
-GitHub release APKs are debug builds intended for direct device testing. The Android `applicationId` remains `com.barisdincer.networkmanager` so existing early Network Manager installs can be updated in place while the app name and Kotlin namespace use CircleKeep.
+GitHub release APKs are signed release builds produced by `assembleRelease` in GitHub Actions. The Android `applicationId` remains `com.barisdincer.networkmanager` so existing early Network Manager installs can be updated in place while the app name and Kotlin namespace use CircleKeep.
 
-The repository includes a stable test debug keystore only so release APKs can keep the same sideload update signature between builds. It is not a production signing key. Install APKs only from the project's official GitHub Releases; a future production distribution should use a private signing key and a documented upgrade path.
+The repository includes a stable test debug keystore only so debug APKs can keep the same sideload update signature between builds. It is not used for public release artifacts. Install APKs only from the project's official GitHub Releases.
 
 ### KMP-Ready Direction
 

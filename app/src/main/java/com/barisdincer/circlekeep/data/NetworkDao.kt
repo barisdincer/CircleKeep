@@ -202,10 +202,10 @@ interface NetworkDao {
         """
         UPDATE person_contact_rhythms
         SET customFrequencyDays = :customFrequencyDays
-        WHERE personId = :personId
+        WHERE personId = :personId AND contactTypeKey = :type
         """
     )
-    suspend fun updatePersonContactRhythmsCustomFrequency(personId: Int, customFrequencyDays: Int?)
+    suspend fun updatePersonContactRhythmCustomFrequency(personId: Int, type: String, customFrequencyDays: Int?)
 
     @Query(
         """
