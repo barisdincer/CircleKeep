@@ -72,11 +72,17 @@ import com.barisdincer.circlekeep.data.presentation.buildInteractionLogPresentat
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleChip
 import com.barisdincer.circlekeep.ui.design.CircleEmptyState
 import com.barisdincer.circlekeep.ui.design.CircleFilterOption
 import com.barisdincer.circlekeep.ui.design.CircleFilterRow
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
+import com.barisdincer.circlekeep.ui.design.CircleScreenScaffold
 import com.barisdincer.circlekeep.ui.design.CircleSearchField
 import com.barisdincer.circlekeep.ui.design.CircleSectionHeader
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -109,54 +115,32 @@ fun LogsScreen(viewModel: NetworkViewModel, onBack: (() -> Unit)? = null) {
         viewModel.clearUiMessage()
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+    CircleScreenScaffold(
+        title = "Temas logları",
+        onBack = onBack,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Temas logları", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge) },
-                    navigationIcon = {
-                        if (onBack != null) {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = CircleSpacing.md),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = CircleSpacing.xs, bottom = CircleSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
         ) {
             item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {
+                CircleCard(containerColor = MaterialTheme.colorScheme.secondaryContainer, border = null) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(CircleSpacing.md),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.History, contentDescription = null)
+                        Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                         Text(
                             "${logPresentation.eventCount} etkinlik · ${logPresentation.filteredRecordCount}/${logPresentation.totalRecordCount} temas kaydı",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                 }
@@ -249,14 +233,9 @@ private fun EventLogCard(
     val participantText = group.participantNames.joinToString(", ").ifBlank { "Silinmiş kişiler" }
     val groupNames = group.waveNames.joinToString(", ")
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+    CircleCard {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(CircleSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -342,8 +321,9 @@ private fun EditEventSheet(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     selectablePeople.forEach { person ->
                         val selected = person.id in selectedPersonIds
-                        FilterChip(
+                        CircleChip(
                             selected = selected,
+                            label = person.name,
                             onClick = {
                                 selectedPersonIds = if (selected) {
                                     selectedPersonIds - person.id
@@ -351,7 +331,6 @@ private fun EditEventSheet(
                                     selectedPersonIds + person.id
                                 }
                             },
-                            label = { Text(person.name) }
                         )
                     }
                 }
@@ -365,7 +344,7 @@ private fun EditEventSheet(
                     label = { Text("İletişim türü") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(CircleRadius.control)
                 )
                 ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
                     typeOptions.forEach { type ->
@@ -392,7 +371,7 @@ private fun EditEventSheet(
                 label = { Text("Not") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(CircleRadius.control)
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -400,15 +379,13 @@ private fun EditEventSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
+                CirclePrimaryButton(
+                    text = "Kaydet",
+                    enabled = selectedPersonIds.isNotEmpty(),
                     onClick = {
                         onSave(selectedPersonIds.toList(), selectedTypeKey, note, timestamp)
                     },
-                    enabled = selectedPersonIds.isNotEmpty(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Kaydet")
-                }
+                )
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -438,8 +415,13 @@ private fun DeleteEventSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                OutlinedButton(onClick = onDelete, shape = RoundedCornerShape(8.dp)) {
-                    Text("Sil")
+                OutlinedButton(
+                    onClick = onDelete,
+                    shape = RoundedCornerShape(CircleRadius.control),
+                    modifier = Modifier.height(48.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                ) {
+                    Text("Sil", color = MaterialTheme.colorScheme.error)
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))

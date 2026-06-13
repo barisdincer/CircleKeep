@@ -1,12 +1,20 @@
 package com.barisdincer.circlekeep.ui.dashboard
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,31 +26,37 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sms
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.contactActionLabel
 import com.barisdincer.circlekeep.ui.PersonWithWave
+import com.barisdincer.circlekeep.ui.design.CircleAvatar
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleCountPill
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
+import com.barisdincer.circlekeep.ui.design.CircleStatusPill
+import com.barisdincer.circlekeep.ui.design.CircleTonalButton
+import com.barisdincer.circlekeep.ui.design.RhythmState
+import com.barisdincer.circlekeep.ui.design.rhythmContainerColor
+import com.barisdincer.circlekeep.ui.design.rhythmContentColor
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -56,19 +70,10 @@ internal fun DashboardActionBar(
     onSync: () -> Unit,
     onOpenBatchLog: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    CircleCard {
+        Column(modifier = Modifier.padding(CircleSpacing.md), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    "Yeni temas kaydı",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Yeni temas kaydı", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     "Buluşma, arama veya mesajı tek kişiye ya da bir gruptaki katılımcılara hızlıca işle.",
                     style = MaterialTheme.typography.bodySmall,
@@ -76,26 +81,17 @@ internal fun DashboardActionBar(
                 )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                CirclePrimaryButton(
+                    text = "Etkinlik ekle",
+                    icon = Icons.Default.EditNote,
                     onClick = onOpenBatchLog,
-                    modifier = Modifier.weight(1f).height(42.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Icon(Icons.Default.EditNote, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Etkinlik ekle")
-                }
-                FilledTonalButton(
-                    enabled = !isSyncing,
+                    modifier = Modifier.weight(1f),
+                )
+                SyncButton(
+                    isSyncing = isSyncing,
                     onClick = onSync,
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Aramaları eşle")
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (isSyncing) "Eşleniyor" else "Eşle")
-                }
+                    modifier = Modifier.weight(1f),
+                )
             }
             Text(
                 syncMessage ?: "Son listede $recentInteractionCount temas kaydı var.",
@@ -103,6 +99,42 @@ internal fun DashboardActionBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/** Tonal "sync" button whose leading refresh icon spins while [isSyncing]. */
+@Composable
+private fun SyncButton(
+    isSyncing: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "sync")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(900), repeatMode = RepeatMode.Restart),
+        label = "syncAngle",
+    )
+    androidx.compose.material3.FilledTonalButton(
+        onClick = onClick,
+        enabled = !isSyncing,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(com.barisdincer.circlekeep.ui.design.CircleRadius.control),
+        colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    ) {
+        Icon(
+            Icons.Default.Refresh,
+            contentDescription = "Aramaları eşle",
+            modifier = Modifier
+                .size(18.dp)
+                .rotate(if (isSyncing) angle else 0f),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(if (isSyncing) "Eşleniyor" else "Eşle", style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -118,8 +150,8 @@ internal fun ReminderSectionTitle(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            CountPill(count)
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            CircleCountPill(count, containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -135,18 +167,11 @@ internal fun UpcomingSectionPanel(
     onLog: (PersonWithWave) -> Unit,
     onSnooze: (PersonWithWave) -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onToggle),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    CircleCard(onClick = onToggle) {
         Column {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = CircleSpacing.md, vertical = CircleSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -159,21 +184,21 @@ internal fun UpcomingSectionPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    CountPill(count)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircleCountPill(count, containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
                     Icon(
-                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (expanded) "Kapat" else "Aç"
+                        Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Kapat" else "Aç",
+                        modifier = Modifier.rotate(chevronRotation),
                     )
                 }
             }
-            if (expanded && contacts.isNotEmpty()) {
+            AnimatedVisibility(visible = expanded && contacts.isNotEmpty(), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
-                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(start = CircleSpacing.sm, end = CircleSpacing.sm, bottom = CircleSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(CircleSpacing.xs)
                 ) {
                     contacts.forEach { contact ->
                         ReminderCard(
@@ -189,31 +214,22 @@ internal fun UpcomingSectionPanel(
 }
 
 @Composable
-private fun CountPill(count: Int) {
-    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-        Text(
-            "$count",
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
 internal fun EmptyFocusCard() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-    ) {
+    CircleCard(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), border = null, elevation = 0.dp) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(CircleSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Bugün sakin", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
@@ -232,48 +248,30 @@ internal fun ReminderCard(
     onLog: () -> Unit,
     onSnooze: () -> Unit
 ) {
-    val statusColor = when {
-        contact.snoozedUntilDate != null -> MaterialTheme.colorScheme.tertiaryContainer
-        contact.daysOverdue > 0 -> MaterialTheme.colorScheme.errorContainer
-        contact.isDue -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val statusTextColor = when {
-        contact.snoozedUntilDate != null -> MaterialTheme.colorScheme.onTertiaryContainer
-        contact.daysOverdue > 0 -> MaterialTheme.colorScheme.onErrorContainer
-        contact.isDue -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ContactTypeIconBox(contact.contactType.key)
+    val state = contact.rhythmState()
+    CircleCard {
+        Column(modifier = Modifier.padding(CircleSpacing.md), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircleAvatar(name = contact.person.name, size = 44.dp)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(contact.person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${contact.contactType.label} · ${contact.scopeText()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(contactTypeIcon(contact.contactType.key), contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "${contact.contactType.label} · ${contact.scopeText()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                Surface(shape = RoundedCornerShape(8.dp), color = statusColor) {
-                    Text(
-                        contact.statusText(),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = statusTextColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                CircleStatusPill(
+                    label = contact.statusText(),
+                    containerColor = rhythmContainerColor(state),
+                    contentColor = rhythmContentColor(state),
+                )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     "Son temas: ${formatShortDate(contact.lastInteractionDate)} · ${contact.daysSinceLastInteraction} gün önce",
                     style = MaterialTheme.typography.bodySmall,
@@ -294,44 +292,20 @@ internal fun ReminderCard(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                CirclePrimaryButton(
+                    text = contactActionLabel(contact.contactType.key, contact.contactType.label),
+                    icon = contactTypeIcon(contact.contactType.key),
                     onClick = onLog,
-                    modifier = Modifier.weight(1f).height(42.dp),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(contactTypeIcon(contact.contactType.key), contentDescription = contact.contactType.label)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(contactActionLabel(contact.contactType.key, contact.contactType.label))
-                }
-                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                )
+                CircleTonalButton(
+                    text = if (contact.snoozedUntilDate != null) "Tarih değiştir" else "Ertele",
+                    icon = Icons.Default.Schedule,
                     onClick = onSnooze,
-                    modifier = Modifier.weight(1f).height(42.dp),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Schedule, contentDescription = "Ertele")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (contact.snoozedUntilDate != null) "Tarih değiştir" else "Ertele")
-                }
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun ContactTypeIconBox(typeKey: String) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            contactTypeIcon(typeKey),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.size(21.dp)
-        )
     }
 }
 
@@ -341,6 +315,13 @@ internal fun contactTypeIcon(typeKey: String): ImageVector {
         DefaultContactTypes.MEETING -> Icons.Default.Group
         else -> Icons.Default.Call
     }
+}
+
+internal fun PersonWithWave.rhythmState(): RhythmState = when {
+    snoozedUntilDate != null -> RhythmState.SNOOZED
+    daysOverdue > 0 -> RhythmState.OVERDUE
+    daysOverdue == 0L && isDue -> RhythmState.TODAY
+    else -> RhythmState.UPCOMING
 }
 
 internal fun PersonWithWave.statusText(): String {

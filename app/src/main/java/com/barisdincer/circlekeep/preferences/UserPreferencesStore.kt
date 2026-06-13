@@ -32,6 +32,13 @@ class UserPreferencesStore(context: Context) {
         refresh()
     }
 
+    fun updateSearchButtonEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(KEY_SEARCH_BUTTON, enabled)
+            .apply()
+        refresh()
+    }
+
     private fun refresh() {
         _preferences.value = readPreferences()
     }
@@ -43,7 +50,8 @@ class UserPreferencesStore(context: Context) {
             avatarColorKey = sharedPreferences.getString(KEY_AVATAR_COLOR, "green").orEmpty().ifBlank { "green" },
             themeMode = sharedPreferences.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
                 ?.let { value -> runCatching { ThemeMode.valueOf(value) }.getOrNull() }
-                ?: ThemeMode.SYSTEM
+                ?: ThemeMode.SYSTEM,
+            searchButtonEnabled = sharedPreferences.getBoolean(KEY_SEARCH_BUTTON, true)
         )
     }
 
@@ -52,5 +60,6 @@ class UserPreferencesStore(context: Context) {
         const val KEY_INITIALS = "initials"
         const val KEY_AVATAR_COLOR = "avatar_color"
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_SEARCH_BUTTON = "search_button_enabled"
     }
 }

@@ -1,13 +1,14 @@
 package com.barisdincer.circlekeep.ui.waves
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,19 +26,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -45,8 +40,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,13 +50,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.ui.NetworkViewModel
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleEmptyState
+import com.barisdincer.circlekeep.ui.design.CircleFab
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
+import com.barisdincer.circlekeep.ui.design.CircleScreenScaffold
 import com.barisdincer.circlekeep.ui.design.CircleSearchField
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,41 +97,27 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
         viewModel.clearManagementMessage()
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+    CircleScreenScaffold(
+        title = "Gruplar",
+        subtitle = "Ritim gruplarını ve iletişim türlerini yönet",
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Gruplar", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge) },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        },
         floatingActionButton = {
-            FloatingActionButton(
+            CircleFab(
                 onClick = {
                     sheetState = if (selectedTab == 0) ManagementSheet.EditGroup(null) else ManagementSheet.EditContactType(null)
                 },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = if (selectedTab == 0) "Grup ekle" else "Tür ekle")
-            }
-        }
+                icon = Icons.Default.Add,
+                contentDescription = if (selectedTab == 0) "Grup ekle" else "Tür ekle",
+            )
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = CircleSpacing.md),
+            contentPadding = PaddingValues(top = CircleSpacing.xs, bottom = CircleSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
         ) {
             item {
                 Text(
@@ -141,17 +128,20 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
             }
 
             item {
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("Gruplar") }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("İletişim türleri") }
-                    )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(CircleRadius.control),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ) {
+                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Gruplar", style = MaterialTheme.typography.labelLarge) })
+                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("İletişim türleri", style = MaterialTheme.typography.labelLarge) })
+                    }
                 }
             }
 
@@ -166,15 +156,16 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
             if (selectedTab == 0) {
                 if (waves.isEmpty()) {
                     item {
-                        EmptyManagementState(
+                        CircleEmptyState(
                             title = "Henüz grup yok",
-                            body = "Yakınlar için 7 gün, arkadaşlar için 21 gün gibi kişisel ritimler ekleyebilirsin."
+                            body = "Yakınlar için 7 gün, arkadaşlar için 21 gün gibi kişisel ritimler ekleyebilirsin.",
+                            icon = Icons.Default.Group,
                         )
                     }
                 }
                 if (waves.isNotEmpty() && filteredWaves.isEmpty()) {
                     item {
-                        EmptyManagementState(
+                        CircleEmptyState(
                             title = "Eşleşen grup yok",
                             body = "Aramayı temizleyerek tüm grupları yeniden görebilirsin."
                         )
@@ -192,15 +183,16 @@ fun WavesScreen(viewModel: NetworkViewModel, onGroupClick: (Int) -> Unit) {
             } else {
                 if (contactTypes.isEmpty()) {
                     item {
-                        EmptyManagementState(
+                        CircleEmptyState(
                             title = "Aktif iletişim türü yok",
-                            body = "Arama, mesaj, buluşma gibi hızlı aksiyon türlerini buradan ekleyebilirsin."
+                            body = "Arama, mesaj, buluşma gibi hızlı aksiyon türlerini buradan ekleyebilirsin.",
+                            icon = Icons.Default.Schedule,
                         )
                     }
                 }
                 if (contactTypes.isNotEmpty() && filteredContactTypes.isEmpty()) {
                     item {
-                        EmptyManagementState(
+                        CircleEmptyState(
                             title = "Eşleşen tür yok",
                             body = "Aramayı temizleyerek tüm iletişim türlerini yeniden görebilirsin."
                         )
@@ -281,34 +273,27 @@ private fun GroupCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+    CircleCard(onClick = onClick) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(CircleSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(CircleRadius.control))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Default.Group,
-                    contentDescription = null,
-                    modifier = Modifier.padding(8.dp).size(18.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(wave.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         "${wave.frequencyDays} günde bir · $personCount kişi",
@@ -334,16 +319,11 @@ private fun ContactTypeCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+    CircleCard {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(CircleSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -370,20 +350,6 @@ private fun ContactTypeCard(
 }
 
 @Composable
-private fun EmptyManagementState(title: String, body: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 private fun GroupSheetContent(
     wave: Wave?,
     onDismiss: () -> Unit,
@@ -405,7 +371,7 @@ private fun GroupSheetContent(
             placeholder = { Text("Yakınlar") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(CircleRadius.control)
         )
         OutlinedTextField(
             value = frequency,
@@ -414,7 +380,7 @@ private fun GroupSheetContent(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(CircleRadius.control)
         )
         SheetActions(
             confirmLabel = if (wave == null) "Ekle" else "Kaydet",
@@ -444,7 +410,7 @@ private fun ContactTypeSheetContent(
             placeholder = { Text("Kahve, yürüyüş, oyun") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(CircleRadius.control)
         )
         SheetActions(
             confirmLabel = if (type == null) "Ekle" else "Kaydet",
@@ -512,13 +478,16 @@ private fun SheetActions(
         }
         Spacer(modifier = Modifier.width(8.dp))
         if (confirmLabel.contains("kaldır", ignoreCase = true)) {
-            OutlinedButton(onClick = onConfirm, enabled = confirmEnabled) {
-                Text(confirmLabel)
+            OutlinedButton(
+                onClick = onConfirm,
+                enabled = confirmEnabled,
+                shape = RoundedCornerShape(CircleRadius.control),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+            ) {
+                Text(confirmLabel, color = MaterialTheme.colorScheme.error)
             }
         } else {
-            Button(onClick = onConfirm, enabled = confirmEnabled) {
-                Text(confirmLabel)
-            }
+            CirclePrimaryButton(text = confirmLabel, enabled = confirmEnabled, onClick = onConfirm)
         }
     }
 }

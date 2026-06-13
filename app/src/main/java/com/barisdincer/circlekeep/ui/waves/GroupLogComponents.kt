@@ -50,6 +50,10 @@ import com.barisdincer.circlekeep.data.Person
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleChip
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,11 +71,7 @@ internal fun GroupEventCard(
         .joinToString(", ")
         .ifBlank { "Silinmiş kişiler" }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-    ) {
+    CircleCard(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = null, elevation = 0.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -149,8 +149,9 @@ internal fun EditGroupEventSheet(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     selectablePeople.forEach { person ->
                         val selected = person.id in selectedPersonIds
-                        FilterChip(
+                        CircleChip(
                             selected = selected,
+                            label = person.name,
                             onClick = {
                                 selectedPersonIds = if (selected) {
                                     selectedPersonIds - person.id
@@ -158,7 +159,6 @@ internal fun EditGroupEventSheet(
                                     selectedPersonIds + person.id
                                 }
                             },
-                            label = { Text(person.name) }
                         )
                     }
                 }
@@ -172,7 +172,7 @@ internal fun EditGroupEventSheet(
                     label = { Text("İletişim türü") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(CircleRadius.control)
                 )
                 ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
                     typeOptions.forEach { type ->
@@ -199,7 +199,7 @@ internal fun EditGroupEventSheet(
                 label = { Text("Not") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(CircleRadius.control)
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -207,15 +207,13 @@ internal fun EditGroupEventSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
+                CirclePrimaryButton(
+                    text = "Kaydet",
+                    enabled = selectedPersonIds.isNotEmpty(),
                     onClick = {
                         onSave(selectedPersonIds.toList(), selectedTypeKey, note, timestamp)
                     },
-                    enabled = selectedPersonIds.isNotEmpty(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Kaydet")
-                }
+                )
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -245,8 +243,13 @@ internal fun DeleteGroupEventSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                OutlinedButton(onClick = onDelete, shape = RoundedCornerShape(8.dp)) {
-                    Text("Sil")
+                OutlinedButton(
+                    onClick = onDelete,
+                    shape = RoundedCornerShape(CircleRadius.control),
+                    modifier = Modifier.height(48.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                ) {
+                    Text("Sil", color = MaterialTheme.colorScheme.error)
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))

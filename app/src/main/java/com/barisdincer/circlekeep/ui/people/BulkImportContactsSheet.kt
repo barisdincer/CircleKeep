@@ -39,7 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.device.PhonebookContact
+import com.barisdincer.circlekeep.ui.design.CircleAvatar
 import com.barisdincer.circlekeep.ui.design.CircleEmptyState
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +91,7 @@ internal fun BulkImportContactsDialog(
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         .fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(CircleRadius.control)
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
@@ -137,7 +140,7 @@ internal fun BulkImportContactsDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(CircleRadius.control))
                                 .background(
                                     if (checked) MaterialTheme.colorScheme.primaryContainer
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -162,7 +165,9 @@ internal fun BulkImportContactsDialog(
                                     }
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            CircleAvatar(name = contact.name, size = 36.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(contact.name, fontWeight = FontWeight.Medium)
                                 Text(
@@ -185,13 +190,11 @@ internal fun BulkImportContactsDialog(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
+                CirclePrimaryButton(
+                    text = "İçe aktar",
                     enabled = selectedContacts.isNotEmpty(),
                     onClick = { onImport(selectedContacts, selectedWaveId) },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("İçe aktar")
-                }
+                )
             }
             Spacer(modifier = Modifier.height(8.dp))
         }

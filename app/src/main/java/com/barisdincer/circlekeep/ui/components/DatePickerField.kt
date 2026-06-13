@@ -52,7 +52,7 @@ fun DatePickerField(
         onClick = { showPicker = true },
         enabled = enabled,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(com.barisdincer.circlekeep.ui.design.CircleRadius.control),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Row(

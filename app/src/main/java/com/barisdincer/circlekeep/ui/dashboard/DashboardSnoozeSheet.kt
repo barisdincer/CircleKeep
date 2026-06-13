@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.ui.PersonWithWave
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -72,9 +74,7 @@ internal fun SnoozeUntilSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onSave(selectedMillis) }, shape = RoundedCornerShape(8.dp)) {
-                    Text("Ertele")
-                }
+                CirclePrimaryButton(text = "Ertele", onClick = { onSave(selectedMillis) })
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -83,7 +83,7 @@ internal fun SnoozeUntilSheet(
 
 @Composable
 private fun SnoozePresetButton(label: String, onClick: () -> Unit) {
-    FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(8.dp)) {
+    FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(CircleRadius.control)) {
         Text(label)
     }
 }

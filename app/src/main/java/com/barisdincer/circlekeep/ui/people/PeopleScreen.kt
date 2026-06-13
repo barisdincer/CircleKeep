@@ -1,66 +1,30 @@
 package com.barisdincer.circlekeep.ui.people
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Contacts
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,37 +33,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.barisdincer.circlekeep.data.ContactType
-import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.Person
-import com.barisdincer.circlekeep.data.Wave
-import com.barisdincer.circlekeep.data.presentation.PeopleListItem
 import com.barisdincer.circlekeep.data.presentation.PeopleListQuery
 import com.barisdincer.circlekeep.data.presentation.PeopleListSort
 import com.barisdincer.circlekeep.data.presentation.PeopleListView
 import com.barisdincer.circlekeep.data.presentation.buildPeopleListItems
 import com.barisdincer.circlekeep.data.sortedByTurkish
-import com.barisdincer.circlekeep.device.PhonebookContact
 import com.barisdincer.circlekeep.device.PhonebookReader
 import com.barisdincer.circlekeep.ui.NetworkViewModel
-import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CircleChip
 import com.barisdincer.circlekeep.ui.design.CircleEmptyState
 import com.barisdincer.circlekeep.ui.design.CircleFilterOption
 import com.barisdincer.circlekeep.ui.design.CircleFilterRow
+import com.barisdincer.circlekeep.ui.design.CircleMotion
+import com.barisdincer.circlekeep.ui.design.CircleRadius
+import com.barisdincer.circlekeep.ui.design.CircleScreenScaffold
 import com.barisdincer.circlekeep.ui.design.CircleSearchField
-import com.barisdincer.circlekeep.ui.design.CircleSectionHeader
-import com.barisdincer.circlekeep.ui.design.CircleStatusPill
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,14 +78,7 @@ fun PeopleScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val peopleItems = remember(
-        people,
-        waves,
-        contactRhythms,
-        searchTerm,
-        selectedView,
-        selectedSort,
-        selectedTag,
-        selectedWaveId
+        people, waves, contactRhythms, searchTerm, selectedView, selectedSort, selectedTag, selectedWaveId
     ) {
         buildPeopleListItems(
             people = people,
@@ -160,64 +108,42 @@ fun PeopleScreen(
         viewModel.clearUiMessage()
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+    CircleScreenScaffold(
+        title = "Kişiler",
+        subtitle = "${people.size} kişi · ritim, etiket ve gruba göre süz",
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Kişiler", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge) },
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                when (PackageManager.PERMISSION_GRANTED) {
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) -> {
-                                        showBulkImportDialog = true
-                                    }
-                                    else -> {
-                                        bulkImportPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-                                    }
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Contacts, contentDescription = "Rehberi içe aktar")
+        actions = {
+            IconButton(
+                onClick = {
+                    when (PackageManager.PERMISSION_GRANTED) {
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) -> {
+                            showBulkImportDialog = true
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                        else -> {
+                            bulkImportPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                        }
+                    }
+                }
+            ) {
+                Icon(Icons.Default.Contacts, contentDescription = "Rehberi içe aktar")
             }
         },
         floatingActionButton = {
-            FloatingActionButton(
+            com.barisdincer.circlekeep.ui.design.CircleFab(
                 onClick = onAddPersonClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Kişi ekle")
-            }
-        }
+                icon = Icons.Default.Add,
+                contentDescription = "Kişi ekle",
+            )
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 12.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = CircleSpacing.md),
+            contentPadding = PaddingValues(top = CircleSpacing.xs, bottom = CircleSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
         ) {
-            item {
-                CircleSectionHeader(
-                    title = "İlişki ağı",
-                    count = peopleItems.size,
-                    subtitle = "${people.size} kişi içinden arama, ritim ve etiketlere göre süzülüyor."
-                )
-            }
-
             item {
                 CircleSearchField(
                     value = searchTerm,
@@ -240,47 +166,19 @@ fun PeopleScreen(
             }
 
             item {
-                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        FilterChip(
-                            selected = selectedSort == PeopleListSort.STATUS,
-                            onClick = { selectedSort = PeopleListSort.STATUS },
-                            label = { Text("Öncelik") }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = selectedSort == PeopleListSort.NAME,
-                            onClick = { selectedSort = PeopleListSort.NAME },
-                            label = { Text("A-Z") }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = selectedSort == PeopleListSort.LAST_CONTACT,
-                            onClick = { selectedSort = PeopleListSort.LAST_CONTACT },
-                            label = { Text("Son temas") }
-                        )
-                    }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item { CircleChip(selectedSort == PeopleListSort.STATUS, "Öncelik") { selectedSort = PeopleListSort.STATUS } }
+                    item { CircleChip(selectedSort == PeopleListSort.NAME, "A-Z") { selectedSort = PeopleListSort.NAME } }
+                    item { CircleChip(selectedSort == PeopleListSort.LAST_CONTACT, "Son temas") { selectedSort = PeopleListSort.LAST_CONTACT } }
                 }
             }
 
             if (waves.isNotEmpty()) {
                 item {
-                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = selectedWaveId == null,
-                                onClick = { selectedWaveId = null },
-                                label = { Text("Tüm gruplar") }
-                            )
-                        }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { CircleChip(selectedWaveId == null, "Tüm gruplar") { selectedWaveId = null } }
                         items(waves) { wave ->
-                            FilterChip(
-                                selected = selectedWaveId == wave.id,
-                                onClick = { selectedWaveId = wave.id },
-                                label = { Text(wave.name) }
-                            )
+                            CircleChip(selectedWaveId == wave.id, wave.name) { selectedWaveId = wave.id }
                         }
                     }
                 }
@@ -288,20 +186,10 @@ fun PeopleScreen(
 
             if (uniqueTags.isNotEmpty()) {
                 item {
-                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = selectedTag == null,
-                                onClick = { selectedTag = null },
-                                label = { Text("Tüm etiketler") }
-                            )
-                        }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { CircleChip(selectedTag == null, "Tüm etiketler") { selectedTag = null } }
                         items(uniqueTags) { tag ->
-                            FilterChip(
-                                selected = selectedTag == tag,
-                                onClick = { selectedTag = tag },
-                                label = { Text(tag) }
-                            )
+                            CircleChip(selectedTag == tag, tag) { selectedTag = tag }
                         }
                     }
                 }
@@ -316,6 +204,7 @@ fun PeopleScreen(
                         } else {
                             "Aramayı veya filtreleri temizleyerek daha geniş bir görünüm aç."
                         },
+                        icon = Icons.Default.Contacts,
                         actionLabel = if (people.isEmpty()) "Kişi ekle" else null,
                         onAction = if (people.isEmpty()) onAddPersonClick else null
                     )
@@ -355,3 +244,4 @@ fun PeopleScreen(
         }
     }
 }
+

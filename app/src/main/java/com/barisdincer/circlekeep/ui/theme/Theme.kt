@@ -5,6 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import com.barisdincer.circlekeep.data.ThemeMode
 
 private val DarkColorScheme =
@@ -63,6 +67,49 @@ private val LightColorScheme =
     onErrorContainer = md_theme_light_onErrorContainer
   )
 
+/** Warm extras that Material 3 does not model (success / warning rhythm states). */
+data class CircleExtraColors(
+  val success: Color,
+  val onSuccess: Color,
+  val successContainer: Color,
+  val onSuccessContainer: Color,
+  val warning: Color,
+  val onWarning: Color,
+  val warningContainer: Color,
+  val onWarningContainer: Color,
+)
+
+private val LightExtraColors = CircleExtraColors(
+  success = Color(0xFF2F8F5B),
+  onSuccess = Color(0xFFFFFFFF),
+  successContainer = Color(0xFFDDF0E4),
+  onSuccessContainer = Color(0xFF0E3A23),
+  warning = Color(0xFFBA7517),
+  onWarning = Color(0xFFFFFFFF),
+  warningContainer = Color(0xFFFCEFD7),
+  onWarningContainer = Color(0xFF4A2E06),
+)
+
+private val DarkExtraColors = CircleExtraColors(
+  success = Color(0xFF7BCB9E),
+  onSuccess = Color(0xFF0E3A23),
+  successContainer = Color(0xFF2A4A37),
+  onSuccessContainer = Color(0xFFDDF0E4),
+  warning = Color(0xFFE7B05A),
+  onWarning = Color(0xFF422C06),
+  warningContainer = Color(0xFF5E4413),
+  onWarningContainer = Color(0xFFFCEFD7),
+)
+
+val LocalCircleExtraColors = staticCompositionLocalOf { LightExtraColors }
+
+object CircleTheme {
+  val extras: CircleExtraColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalCircleExtraColors.current
+}
+
 @Composable
 fun MyApplicationTheme(
   themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -73,11 +120,10 @@ fun MyApplicationTheme(
     ThemeMode.LIGHT -> false
     ThemeMode.DARK -> true
   }
-  val colorScheme =
-    when {
-      darkTheme -> DarkColorScheme
-      else -> LightColorScheme
-    }
+  val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+  val extraColors = if (darkTheme) DarkExtraColors else LightExtraColors
 
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  CompositionLocalProvider(LocalCircleExtraColors provides extraColors) {
+    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  }
 }

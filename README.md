@@ -137,6 +137,13 @@ Security-sensitive areas include:
 
 CircleKeep is currently pre-1.0. Breaking changes may happen, but privacy regressions should be treated as bugs.
 
+## Third-Party Assets
+
+The UI bundles the [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans)
+typeface (`app/src/main/res/font/`), licensed under the SIL Open Font License 1.1.
+The font files are shipped inside the APK so the app keeps working fully offline and
+never needs network access to download fonts.
+
 ## License
 
 CircleKeep is released under the MIT License. See [LICENSE](LICENSE).

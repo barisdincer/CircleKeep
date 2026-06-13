@@ -2,8 +2,14 @@ package com.barisdincer.circlekeep.ui.profile
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +17,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,23 +34,17 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SettingsSuggest
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,8 +61,16 @@ import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.ThemeMode
 import com.barisdincer.circlekeep.data.UserPreferences
 import com.barisdincer.circlekeep.ui.BackupUiState
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleChip
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
+import com.barisdincer.circlekeep.ui.design.CircleScreenScaffold
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
+import com.barisdincer.circlekeep.ui.design.CircleTonalButton
+import com.barisdincer.circlekeep.ui.design.circlePressable
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
     preferences: UserPreferences,
@@ -72,6 +78,7 @@ fun ProfileScreen(
     onLogsClick: () -> Unit,
     onSaveProfile: (String, String, String) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onToggleSearchButton: (Boolean) -> Unit,
     onCreateBackupJson: ((String) -> Unit) -> Unit,
     onRestoreBackupJson: (String) -> Unit
 ) {
@@ -113,39 +120,19 @@ fun ProfileScreen(
         avatarColorKey = preferences.avatarColorKey
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Profil", fontWeight = FontWeight.SemiBold) },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        }
-    ) { padding ->
+    CircleScreenScaffold(title = "Profil") { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = CircleSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            CircleCard {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(CircleSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -158,7 +145,7 @@ fun ProfileScreen(
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
                                 displayName.ifBlank { "CircleKeep profili" },
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -167,80 +154,85 @@ fun ProfileScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        IconButton(onClick = { editingProfile = true }) {
+                        IconButton(onClick = { editingProfile = !editingProfile }) {
                             Icon(Icons.Default.Edit, contentDescription = "Profili düzenle")
                         }
                     }
-                    if (editingProfile) {
-                        OutlinedTextField(
-                            value = displayName,
-                            onValueChange = { displayName = it },
-                            label = { Text("Adın") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = initials,
-                            onValueChange = { initials = it.uppercase().take(3) },
-                            label = { Text("Avatar harfleri") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            avatarOptions.forEach { option ->
-                                ColorChoice(
-                                    label = option.label,
-                                    color = option.color,
-                                    selected = avatarColorKey == option.key,
-                                    onClick = { avatarColorKey = option.key }
+                    AnimatedVisibility(visible = editingProfile, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)) {
+                            OutlinedTextField(
+                                value = displayName,
+                                onValueChange = { displayName = it },
+                                label = { Text("Adın") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(CircleRadius.control)
+                            )
+                            OutlinedTextField(
+                                value = initials,
+                                onValueChange = { initials = it.uppercase().take(3) },
+                                label = { Text("Avatar harfleri") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(CircleRadius.control)
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                avatarOptions.forEach { option ->
+                                    ColorChoice(
+                                        label = option.label,
+                                        color = option.color,
+                                        selected = avatarColorKey == option.key,
+                                        onClick = { avatarColorKey = option.key }
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = {
+                                        displayName = preferences.displayName
+                                        initials = preferences.displayInitials
+                                        avatarColorKey = preferences.avatarColorKey
+                                        editingProfile = false
+                                    }
+                                ) {
+                                    Text("Vazgeç")
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                CirclePrimaryButton(
+                                    text = "Kaydet",
+                                    onClick = {
+                                        onSaveProfile(displayName, initials, avatarColorKey)
+                                        editingProfile = false
+                                    }
                                 )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(
-                                onClick = {
-                                    displayName = preferences.displayName
-                                    initials = preferences.displayInitials
-                                    avatarColorKey = preferences.avatarColorKey
-                                    editingProfile = false
-                                }
-                            ) {
-                                Text("Vazgeç")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    onSaveProfile(displayName, initials, avatarColorKey)
-                                    editingProfile = false
-                                }
-                            ) {
-                                Text("Kaydet")
                             }
                         }
                     }
                 }
             }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onLogsClick,
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            CircleCard(onClick = onLogsClick) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(CircleSpacing.md),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(CircleRadius.control))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Temas logları", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
@@ -253,15 +245,10 @@ fun ProfileScreen(
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            CircleCard {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(CircleSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
                 ) {
                     Text("JSON yedeği", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
@@ -269,37 +256,30 @@ fun ProfileScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CirclePrimaryButton(
+                            text = "Dışa aktar",
                             onClick = {
                                 onCreateBackupJson { json ->
                                     pendingBackupJson = json
                                     createBackupLauncher.launch("circlekeep-yedek.json")
                                 }
                             }
-                        ) {
-                            Text("Dışa aktar")
-                        }
-                        OutlinedButton(
+                        )
+                        CircleTonalButton(
+                            text = "Geri yükle",
                             onClick = {
                                 restoreBackupLauncher.launch(arrayOf("application/json", "text/*"))
                             }
-                        ) {
-                            Text("Geri yükle")
-                        }
+                        )
                     }
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            CircleCard {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(CircleSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(Icons.Default.SettingsSuggest, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -311,20 +291,40 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemeModeChip("Sistem", Icons.Default.SettingsSuggest, ThemeMode.SYSTEM, preferences.themeMode, onThemeModeChange)
-                        ThemeModeChip("Açık", Icons.Default.LightMode, ThemeMode.LIGHT, preferences.themeMode, onThemeModeChange)
-                        ThemeModeChip("Koyu", Icons.Default.DarkMode, ThemeMode.DARK, preferences.themeMode, onThemeModeChange)
+                        CircleChip(preferences.themeMode == ThemeMode.SYSTEM, "Sistem", leadingIcon = Icons.Default.SettingsSuggest) { onThemeModeChange(ThemeMode.SYSTEM) }
+                        CircleChip(preferences.themeMode == ThemeMode.LIGHT, "Açık", leadingIcon = Icons.Default.LightMode) { onThemeModeChange(ThemeMode.LIGHT) }
+                        CircleChip(preferences.themeMode == ThemeMode.DARK, "Koyu", leadingIcon = Icons.Default.DarkMode) { onThemeModeChange(ThemeMode.DARK) }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .circlePressable { onToggleSearchButton(!preferences.searchButtonEnabled) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Alt çubukta arama düğmesi", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Kapatırsan alt menüdeki hızlı arama düğmesi gizlenir.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = preferences.searchButtonEnabled,
+                            onCheckedChange = onToggleSearchButton
+                        )
                     }
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
+            CircleCard(containerColor = MaterialTheme.colorScheme.primaryContainer, border = null) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(CircleSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -344,7 +344,7 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.padding(bottom = CircleSpacing.lg))
         }
     }
 }
@@ -353,14 +353,14 @@ fun ProfileScreen(
 private fun ProfileAvatar(initials: String, color: Color) {
     Box(
         modifier = Modifier
-            .size(56.dp)
+            .size(60.dp)
             .clip(CircleShape)
             .background(color),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = initials.take(3).ifBlank { "CK" },
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Black,
             color = Color.White
         )
@@ -369,45 +369,29 @@ private fun ProfileAvatar(initials: String, color: Color) {
 
 @Composable
 private fun ColorChoice(label: String, color: Color, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+    val shape = RoundedCornerShape(CircleRadius.pill)
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(1.dp, borderColor), shape)
+            .circlePressable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(color)
-            )
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            if (selected) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-            }
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
         }
     }
-}
-
-@Composable
-private fun ThemeModeChip(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    themeMode: ThemeMode,
-    selectedThemeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit
-) {
-    FilterChip(
-        selected = selectedThemeMode == themeMode,
-        onClick = { onThemeModeChange(themeMode) },
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
-    )
 }
 
 private data class AvatarOption(

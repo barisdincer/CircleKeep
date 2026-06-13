@@ -49,6 +49,9 @@ import com.barisdincer.circlekeep.data.contactActionLabel
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.ui.PersonWithWave
 import com.barisdincer.circlekeep.ui.components.DatePickerField
+import com.barisdincer.circlekeep.ui.design.CircleAvatar
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
 import com.barisdincer.circlekeep.ui.design.CircleSearchField
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,7 +128,7 @@ internal fun ContactLogSheet(
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         .fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(CircleRadius.control)
                 )
                 ExposedDropdownMenu(
                     expanded = typeExpanded,
@@ -162,7 +165,7 @@ internal fun ContactLogSheet(
             } else {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(CircleRadius.control),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                 ) {
                     Text(
@@ -181,7 +184,7 @@ internal fun ContactLogSheet(
                 placeholder = { Text("Ne oldu, kim katıldı, ne konuşuldu?") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(CircleRadius.control)
             )
 
             Row(
@@ -193,15 +196,13 @@ internal fun ContactLogSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
+                CirclePrimaryButton(
+                    text = contactActionLabel(selectedType.key, selectedType.label),
                     enabled = selectedPersonIds.isNotEmpty(),
                     onClick = {
                         onSave(selectedPersonIds.toList(), selectedType.key, note, selectedTimestamp)
                     },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(contactActionLabel(selectedType.key, selectedType.label))
-                }
+                )
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -245,7 +246,7 @@ private fun ParticipantPicker(
             modifier = Modifier
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                 .fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(CircleRadius.control)
         )
         ExposedDropdownMenu(
             expanded = groupExpanded,
@@ -285,7 +286,7 @@ private fun ParticipantPicker(
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(CircleRadius.control),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ) {
                     Text(
@@ -302,7 +303,7 @@ private fun ParticipantPicker(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(CircleRadius.control))
                     .clickable {
                         onSelectionChange(
                             if (checked) selectedPersonIds - person.id else selectedPersonIds + person.id
@@ -319,7 +320,9 @@ private fun ParticipantPicker(
                         )
                     }
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                CircleAvatar(name = person.name, size = 36.dp)
+                Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(person.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                     Text(

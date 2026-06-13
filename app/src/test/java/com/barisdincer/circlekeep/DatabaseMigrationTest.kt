@@ -3,6 +3,7 @@ package com.barisdincer.circlekeep
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.test.core.app.ApplicationProvider
 import com.barisdincer.circlekeep.data.AppDatabase
 import com.barisdincer.circlekeep.data.DatabaseMigrations
@@ -138,6 +139,10 @@ class DatabaseMigrationTest {
     private fun openMigratedDatabase(context: Context, dbName: String): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, dbName)
             .addMigrations(*DatabaseMigrations.ALL)
+            // Robolectric's SQLite can fail to create the WAL sidecar files on some
+            // hosts (SQLITE_CANTOPEN); TRUNCATE journaling keeps the migration test
+            // deterministic across environments without changing migration behavior.
+            .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
             .allowMainThreadQueries()
             .build()
     }

@@ -1,20 +1,20 @@
 package com.barisdincer.circlekeep.ui.waves
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,35 +22,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,7 +55,6 @@ import com.barisdincer.circlekeep.data.ContactType
 import com.barisdincer.circlekeep.data.DefaultContactTypes
 import com.barisdincer.circlekeep.data.InteractionLog
 import com.barisdincer.circlekeep.data.Person
-import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.data.groupMemberRhythm
 import com.barisdincer.circlekeep.data.sortedByTurkish
 import com.barisdincer.circlekeep.data.statusLabel
@@ -74,7 +62,19 @@ import com.barisdincer.circlekeep.ui.NetworkViewModel
 import com.barisdincer.circlekeep.ui.components.DatePickerField
 import com.barisdincer.circlekeep.ui.components.InteractionEventGroup
 import com.barisdincer.circlekeep.ui.components.interactionEventGroups
+import com.barisdincer.circlekeep.ui.design.CircleAvatar
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleChip
+import com.barisdincer.circlekeep.ui.design.CircleEmptyState
+import com.barisdincer.circlekeep.ui.design.CirclePrimaryButton
+import com.barisdincer.circlekeep.ui.design.CircleRadius
+import com.barisdincer.circlekeep.ui.design.CircleScreenScaffold
 import com.barisdincer.circlekeep.ui.design.CircleSearchField
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
+import com.barisdincer.circlekeep.ui.design.CircleStatusPill
+import com.barisdincer.circlekeep.ui.design.RhythmState
+import com.barisdincer.circlekeep.ui.design.rhythmContainerColor
+import com.barisdincer.circlekeep.ui.design.rhythmContentColor
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -124,20 +124,7 @@ fun GroupDetailScreen(
     }
 
     if (wave == null) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
-            topBar = {
-                TopAppBar(
-                    title = { Text("Grup bulunamadı") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                        }
-                    }
-                )
-            }
-        ) { padding ->
+        CircleScreenScaffold(title = "Grup bulunamadı", onBack = onBack) { padding ->
             Text(
                 "Bu grup artık mevcut değil.",
                 modifier = Modifier.padding(padding).padding(16.dp)
@@ -146,35 +133,19 @@ fun GroupDetailScreen(
         return
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+    CircleScreenScaffold(
+        title = wave.name,
+        subtitle = "${allGroupPeople.size} kişi · ${wave.frequencyDays} günde bir",
+        onBack = onBack,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text(wave.name, fontWeight = FontWeight.SemiBold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = CircleSpacing.md),
+            contentPadding = PaddingValues(top = CircleSpacing.xs, bottom = CircleSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)
         ) {
             item {
                 GroupActionsCard(
@@ -193,30 +164,40 @@ fun GroupDetailScreen(
                         onValueChange = { memberSearch = it },
                         placeholder = "Grupta kişi ara"
                     )
-                    FilterChip(
+                    CircleChip(
                         selected = onlyWaitingMembers,
+                        label = "Sadece bekleyenler",
                         onClick = { onlyWaitingMembers = !onlyWaitingMembers },
-                        label = { Text("Sadece bekleyenler") }
                     )
                 }
             }
 
             item {
-                Text("Üyeler (${groupPeople.size}/${allGroupPeople.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Üyeler (${groupPeople.size}/${allGroupPeople.size})", style = MaterialTheme.typography.titleLarge)
             }
 
             if (groupPeople.isEmpty()) {
                 item {
-                    EmptyGroupCard()
+                    CircleEmptyState(
+                        title = "Bu grupta kişi yok",
+                        body = "Yeni kişi ekleyerek ya da mevcut kişileri taşıyarak grubu doldurabilirsin.",
+                        icon = Icons.Default.Group,
+                    )
                 }
             }
 
             items(groupPeople, key = { it.id }) { person ->
                 val rhythm = groupMemberRhythm(person, wave)
                 val lastLog = groupLogs.firstOrNull { it.personId == person.id }
+                val state = when {
+                    rhythm.isOverdue -> RhythmState.OVERDUE
+                    rhythm.isDueToday -> RhythmState.TODAY
+                    else -> RhythmState.ON_TRACK
+                }
                 GroupMemberCard(
                     person = person,
                     rhythmLabel = rhythm.statusLabel(),
+                    state = state,
                     daysSince = rhythm.daysSinceLastInteraction,
                     effectiveFrequencyDays = rhythm.effectiveFrequencyDays,
                     lastLog = lastLog,
@@ -226,7 +207,7 @@ fun GroupDetailScreen(
             }
 
             item {
-                Text("Temas geçmişi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Temas geçmişi", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = CircleSpacing.xs))
             }
 
             if (groupEvents.isEmpty()) {
@@ -308,31 +289,22 @@ private fun GroupActionsCard(
     onExistingPerson: () -> Unit,
     onLogGroup: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    CircleCard(containerColor = MaterialTheme.colorScheme.primaryContainer, border = null) {
+        Column(modifier = Modifier.padding(CircleSpacing.md), verticalArrangement = Arrangement.spacedBy(CircleSpacing.sm)) {
             Text(
                 "$memberCount kişi · $frequencyDays günde bir",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onLogGroup, shape = RoundedCornerShape(8.dp)) {
-                    Icon(Icons.Default.EditNote, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Etkinlik ekle")
-                }
-                OutlinedButton(onClick = onNewPerson, shape = RoundedCornerShape(8.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                CirclePrimaryButton(text = "Etkinlik ekle", icon = Icons.Default.EditNote, onClick = onLogGroup)
+                OutlinedButton(onClick = onNewPerson, shape = RoundedCornerShape(CircleRadius.control), modifier = Modifier.height(48.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Yeni kişi")
                 }
-                OutlinedButton(onClick = onExistingPerson, shape = RoundedCornerShape(8.dp)) {
-                    Icon(Icons.Default.Group, contentDescription = null)
+                OutlinedButton(onClick = onExistingPerson, shape = RoundedCornerShape(CircleRadius.control), modifier = Modifier.height(48.dp)) {
+                    Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Mevcut kişi")
                 }
@@ -345,67 +317,47 @@ private fun GroupActionsCard(
 private fun GroupMemberCard(
     person: Person,
     rhythmLabel: String,
+    state: RhythmState,
     daysSince: Long,
     effectiveFrequencyDays: Int,
     lastLog: InteractionLog?,
     contactTypes: List<ContactType>,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+    CircleCard(onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(CircleSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CircleAvatar(name = person.name, size = 44.dp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        rhythmLabel,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold
+                    Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
+                    CircleStatusPill(
+                        label = rhythmLabel,
+                        containerColor = rhythmContainerColor(state),
+                        contentColor = rhythmContentColor(state),
                     )
                 }
-            }
-            Text(
-                "$daysSince gün önce temas · ritim $effectiveFrequencyDays gün",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            lastLog?.let {
                 Text(
-                    "Son kayıt: ${interactionTypeLabel(it.type, contactTypes)} · ${formatShortDate(it.timestamp)}",
+                    "$daysSince gün önce temas · ritim $effectiveFrequencyDays gün",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                lastLog?.let {
+                    Text(
+                        "Son kayıt: ${interactionTypeLabel(it.type, contactTypes)} · ${formatShortDate(it.timestamp)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyGroupCard() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Text(
-            "Bu grupta henüz kişi yok.",
-            modifier = Modifier.padding(14.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -459,9 +411,9 @@ private fun ExistingPersonSheet(
             ) {
                 items(sortedPeople, key = { it.id }) { person ->
                     val checked = person.id in selectedPersonIds
-                    Surface(
+                    androidx.compose.material3.Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(CircleRadius.control),
                         color = if (checked) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
@@ -476,8 +428,9 @@ private fun ExistingPersonSheet(
                         }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Checkbox(
                                 checked = checked,
@@ -489,7 +442,7 @@ private fun ExistingPersonSheet(
                                     }
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            CircleAvatar(name = person.name, size = 36.dp)
                             Text(person.name, fontWeight = FontWeight.Medium)
                         }
                     }
@@ -500,13 +453,11 @@ private fun ExistingPersonSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
+                CirclePrimaryButton(
+                    text = "Gruba ekle",
                     enabled = selectedPersonIds.isNotEmpty(),
                     onClick = { onSave(selectedPersonIds.toList()) },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Gruba ekle")
-                }
+                )
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
@@ -554,7 +505,7 @@ private fun GroupContactLogSheet(
                     label = { Text("İletişim türü") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(CircleRadius.control)
                 )
                 ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
                     typeOptions.forEach { type ->
@@ -593,7 +544,8 @@ private fun GroupContactLogSheet(
                                 }
                             }
                             .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Checkbox(
                             checked = checked,
@@ -605,7 +557,7 @@ private fun GroupContactLogSheet(
                                 }
                             }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        CircleAvatar(name = person.name, size = 34.dp)
                         Text(person.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                     }
                 }
@@ -618,7 +570,7 @@ private fun GroupContactLogSheet(
                 placeholder = { Text("Buluşma, arama veya mesaj notu") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(CircleRadius.control)
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -626,15 +578,13 @@ private fun GroupContactLogSheet(
                     Text("Vazgeç")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
+                CirclePrimaryButton(
+                    text = "Kaydet",
                     enabled = selectedPersonIds.isNotEmpty(),
                     onClick = {
                         onSave(selectedPersonIds.toList(), selectedType.key, note, selectedTimestamp)
                     },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Kaydet")
-                }
+                )
             }
             Spacer(modifier = Modifier.height(10.dp))
         }

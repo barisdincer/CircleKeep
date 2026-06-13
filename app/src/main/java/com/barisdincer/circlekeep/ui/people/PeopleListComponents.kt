@@ -1,28 +1,25 @@
 package com.barisdincer.circlekeep.ui.people
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barisdincer.circlekeep.data.presentation.PeopleListItem
+import com.barisdincer.circlekeep.ui.design.CircleAvatar
+import com.barisdincer.circlekeep.ui.design.CircleCard
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
 import com.barisdincer.circlekeep.ui.design.CircleStatusPill
+import com.barisdincer.circlekeep.ui.design.RhythmState
+import com.barisdincer.circlekeep.ui.design.rhythmContainerColor
+import com.barisdincer.circlekeep.ui.design.rhythmContentColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,33 +30,16 @@ internal fun PersonListCard(
     onClick: () -> Unit
 ) {
     val person = item.person
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
+    val state = item.rhythmState()
+    CircleCard(onClick = onClick) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(CircleSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = person.name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
+            CircleAvatar(name = person.name, size = 48.dp)
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Row(
@@ -67,11 +47,11 @@ internal fun PersonListCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
                     CircleStatusPill(
                         label = item.statusText(),
-                        containerColor = item.statusContainerColor(),
-                        contentColor = item.statusContentColor()
+                        containerColor = rhythmContainerColor(state),
+                        contentColor = rhythmContentColor(state)
                     )
                 }
                 Text(
@@ -107,20 +87,11 @@ internal fun PersonListCard(
     }
 }
 
-@Composable
-private fun PeopleListItem.statusContainerColor() = when {
-    isOverdue -> MaterialTheme.colorScheme.errorContainer
-    isDueToday -> MaterialTheme.colorScheme.primaryContainer
-    isUpcoming -> MaterialTheme.colorScheme.secondaryContainer
-    else -> MaterialTheme.colorScheme.surfaceVariant
-}
-
-@Composable
-private fun PeopleListItem.statusContentColor() = when {
-    isOverdue -> MaterialTheme.colorScheme.onErrorContainer
-    isDueToday -> MaterialTheme.colorScheme.onPrimaryContainer
-    isUpcoming -> MaterialTheme.colorScheme.onSecondaryContainer
-    else -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun PeopleListItem.rhythmState(): RhythmState = when {
+    isOverdue -> RhythmState.OVERDUE
+    isDueToday -> RhythmState.TODAY
+    isUpcoming -> RhythmState.UPCOMING
+    else -> RhythmState.ON_TRACK
 }
 
 private fun PeopleListItem.statusText(): String {

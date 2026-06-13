@@ -1,8 +1,17 @@
 package com.barisdincer.circlekeep.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,25 +19,26 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -60,7 +71,12 @@ import com.barisdincer.circlekeep.data.Wave
 import com.barisdincer.circlekeep.preferences.UserPreferencesStore
 import com.barisdincer.circlekeep.ui.dashboard.DashboardScreen
 import com.barisdincer.circlekeep.ui.dashboard.EventLogScreen
+import com.barisdincer.circlekeep.ui.design.CircleAvatar
+import com.barisdincer.circlekeep.ui.design.CircleEmptyState
+import com.barisdincer.circlekeep.ui.design.CircleRadius
 import com.barisdincer.circlekeep.ui.design.CircleSearchField
+import com.barisdincer.circlekeep.ui.design.CircleSpacing
+import com.barisdincer.circlekeep.ui.design.circlePressable
 import com.barisdincer.circlekeep.ui.logs.LogsScreen
 import com.barisdincer.circlekeep.ui.people.AddPersonScreen
 import com.barisdincer.circlekeep.ui.people.PeopleScreen
@@ -69,6 +85,21 @@ import com.barisdincer.circlekeep.ui.profile.ProfileScreen
 import com.barisdincer.circlekeep.ui.reports.ReportsScreen
 import com.barisdincer.circlekeep.ui.waves.GroupDetailScreen
 import com.barisdincer.circlekeep.ui.waves.WavesScreen
+
+private data class NavDestination(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+    val matches: (String) -> Boolean,
+)
+
+private val navDestinations = listOf(
+    NavDestination("dashboard", "Bugün", Icons.Default.Today) { it == "dashboard" || it == "event_log" },
+    NavDestination("people", "Kişiler", Icons.Default.People) { it == "people" || it.startsWith("person_detail") || it.startsWith("add_person") },
+    NavDestination("waves", "Gruplar", Icons.Default.Groups) { it == "waves" || it.startsWith("group_detail") },
+    NavDestination("reports", "Özet", Icons.Default.Insights) { it == "reports" },
+    NavDestination("profile", "Profil", Icons.Default.Person) { it == "profile" || it == "logs" },
+)
 
 @Composable
 fun AppNavigation(
@@ -95,8 +126,9 @@ fun AppNavigation(
             contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
             bottomBar = {
                 if (!expandedNavigation) {
-                    BottomNavigationBar(
+                    AppBottomBar(
                         navController = navController,
+                        searchEnabled = userPreferences.searchButtonEnabled,
                         onQuickSearch = { showQuickSearch = true }
                     )
                 }
@@ -110,6 +142,7 @@ fun AppNavigation(
                 if (expandedNavigation) {
                     AppNavigationRail(
                         navController = navController,
+                        searchEnabled = userPreferences.searchButtonEnabled,
                         onQuickSearch = { showQuickSearch = true }
                     )
                 }
@@ -157,7 +190,11 @@ private fun AppNavHost(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(paddingValues)
+            .padding(paddingValues),
+        enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 24 } },
+        exitTransition = { fadeOut(tween(160)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(160)) + slideOutHorizontally(tween(220)) { it / 24 } },
     ) {
         composable("dashboard") {
             DashboardScreen(
@@ -240,6 +277,7 @@ private fun AppNavHost(
                 onLogsClick = { navController.navigate("logs") },
                 onSaveProfile = preferencesStore::updateProfile,
                 onThemeModeChange = preferencesStore::updateThemeMode,
+                onToggleSearchButton = preferencesStore::updateSearchButtonEnabled,
                 onCreateBackupJson = viewModel::createBackupJson,
                 onRestoreBackupJson = viewModel::restoreBackupJson
             )
@@ -279,135 +317,135 @@ private fun AppNavHost(
 }
 
 @Composable
-private fun BottomNavigationBar(navController: NavHostController, onQuickSearch: () -> Unit) {
+private fun AppBottomBar(navController: NavHostController, searchEnabled: Boolean, onQuickSearch: () -> Unit) {
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route.orEmpty()
 
-    Surface(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding(),
-        color = MaterialTheme.colorScheme.surface
+            .navigationBarsPadding()
+            .padding(horizontal = CircleSpacing.sm, vertical = CircleSpacing.xs)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(58.dp)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(CircleRadius.pill),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 12.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            CompactNavItem(
-                selected = false,
-                label = "Ara",
-                icon = Icons.Default.Search,
-                modifier = Modifier.width(52.dp),
-                onClick = onQuickSearch
-            )
-            CompactNavItem(
-                selected = currentDestination == "dashboard" || currentDestination == "event_log",
-                label = "Bugün",
-                icon = Icons.Default.Dashboard,
-                modifier = Modifier.weight(1f),
-                onClick = { navController.navigateTopLevel("dashboard") }
-            )
-            CompactNavItem(
-                selected = currentDestination == "people" || currentDestination.startsWith("person_detail") || currentDestination.startsWith("add_person"),
-                label = "Kişiler",
-                icon = Icons.Default.Group,
-                modifier = Modifier.weight(1f),
-                onClick = { navController.navigateTopLevel("people") }
-            )
-            CompactNavItem(
-                selected = currentDestination == "waves" || currentDestination.startsWith("group_detail"),
-                label = "Gruplar",
-                icon = Icons.Default.Group,
-                modifier = Modifier.weight(1f),
-                onClick = { navController.navigateTopLevel("waves") }
-            )
-            CompactNavItem(
-                selected = currentDestination == "reports",
-                label = "Özet",
-                icon = Icons.Default.DateRange,
-                modifier = Modifier.weight(1f),
-                onClick = { navController.navigateTopLevel("reports") }
-            )
-            CompactNavItem(
-                selected = currentDestination == "profile" || currentDestination == "logs",
-                label = "Profil",
-                icon = Icons.Default.Person,
-                modifier = Modifier.weight(1f),
-                onClick = { navController.navigateTopLevel("profile") }
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                AnimatedVisibility(
+                    visible = searchEnabled,
+                    enter = fadeIn() + expandHorizontally(),
+                    exit = fadeOut() + shrinkHorizontally(),
+                ) {
+                    NavSearchButton(onClick = onQuickSearch)
+                }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    navDestinations.forEach { destination ->
+                        BottomNavItem(
+                            selected = destination.matches(currentDestination),
+                            label = destination.label,
+                            icon = destination.icon,
+                            onClick = { navController.navigateTopLevel(destination.route) },
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun AppNavigationRail(navController: NavHostController, onQuickSearch: () -> Unit) {
-    val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route.orEmpty()
-
-    NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
-        NavigationRailItem(
-            selected = false,
-            onClick = onQuickSearch,
-            icon = { Icon(Icons.Default.Search, contentDescription = null) },
-            label = { Text("Ara") }
-        )
-        NavigationRailItem(
-            selected = currentDestination == "dashboard" || currentDestination == "event_log",
-            onClick = { navController.navigateTopLevel("dashboard") },
-            icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
-            label = { Text("Bugün") }
-        )
-        NavigationRailItem(
-            selected = currentDestination == "people" || currentDestination.startsWith("person_detail") || currentDestination.startsWith("add_person"),
-            onClick = { navController.navigateTopLevel("people") },
-            icon = { Icon(Icons.Default.Group, contentDescription = null) },
-            label = { Text("Kişiler") }
-        )
-        NavigationRailItem(
-            selected = currentDestination == "waves" || currentDestination.startsWith("group_detail"),
-            onClick = { navController.navigateTopLevel("waves") },
-            icon = { Icon(Icons.Default.Group, contentDescription = null) },
-            label = { Text("Gruplar") }
-        )
-        NavigationRailItem(
-            selected = currentDestination == "reports",
-            onClick = { navController.navigateTopLevel("reports") },
-            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-            label = { Text("Özet") }
-        )
-        NavigationRailItem(
-            selected = currentDestination == "profile" || currentDestination == "logs",
-            onClick = { navController.navigateTopLevel("profile") },
-            icon = { Icon(Icons.Default.Person, contentDescription = null) },
-            label = { Text("Profil") }
+private fun NavSearchButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .circlePressable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Default.Search,
+            contentDescription = "Ara",
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
 
 @Composable
-private fun CompactNavItem(
+private fun BottomNavItem(
     selected: Boolean,
     label: String,
     icon: ImageVector,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = modifier
-            .height(50.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    val container by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+        label = "navContainer",
+    )
+    val content by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "navContent",
+    )
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(CircleRadius.pill))
+            .background(container)
+            .circlePressable(onClick = onClick)
+            .padding(horizontal = if (selected) 14.dp else 11.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = contentColor)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = contentColor)
+        Icon(icon, contentDescription = label, tint = content, modifier = Modifier.size(22.dp))
+        AnimatedVisibility(
+            visible = selected,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally(),
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = content, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationRail(navController: NavHostController, searchEnabled: Boolean, onQuickSearch: () -> Unit) {
+    val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route.orEmpty()
+
+    NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+        if (searchEnabled) {
+            NavigationRailItem(
+                selected = false,
+                onClick = onQuickSearch,
+                icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                label = { Text("Ara") }
+            )
+        }
+        navDestinations.forEach { destination ->
+            NavigationRailItem(
+                selected = destination.matches(currentDestination),
+                onClick = { navController.navigateTopLevel(destination.route) },
+                icon = { Icon(destination.icon, contentDescription = null) },
+                label = { Text(destination.label) },
+                colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            )
+        }
     }
 }
 
@@ -430,7 +468,8 @@ private fun QuickSearchDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Hızlı ara") },
+        shape = RoundedCornerShape(CircleRadius.card),
+        title = { Text("Hızlı ara", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CircleSearchField(
@@ -441,13 +480,13 @@ private fun QuickSearchDialog(
                 if (trimmedQuery.isBlank()) {
                     Text(
                         "Bir isim yazarak kişi detayına ya da grup görünümüne doğrudan geç.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else if (matchedPeople.isEmpty() && matchedWaves.isEmpty()) {
                     Text("Sonuç bulunamadı.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(matchedPeople, key = { "p-${it.id}" }) { person ->
                             QuickSearchRow(
                                 title = person.name,
@@ -477,13 +516,18 @@ private fun QuickSearchDialog(
 
 @Composable
 private fun QuickSearchRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-        onClick = onClick
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(CircleRadius.control))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .circlePressable(onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        CircleAvatar(name = title, size = 38.dp)
+        Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
